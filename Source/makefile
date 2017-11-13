@@ -26,20 +26,20 @@ clean :
 
 
 vectors.o : vectors.s
-	$(ARMGNU)-as vectors.s -o vectors.o
+	$(ARMGNU)-as $< -o $@
 
 periph.o : periph.c
-	$(ARMGNU)-gcc $(COPS) -c periph.c -o periph.o
+	$(ARMGNU)-gcc $(COPS) -c $< -o $@
 
 %.o : %.cpp
 	$(ARMGNU)-g++ $(CPPOPS) -c $< -o $@
 
 
-$(TARGET) : loader vectors.o periph.o $(CPPOBJECTS)
+$(TARGET) : loader $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS)
 	@echo $(SOBJECTS)
 	@echo $(COBJECTS)
 	@echo $(CPPOBJECTS)
-	$(ARMGNU)-ld vectors.o periph.o $(CPPOBJECTS) -T loader -o video01.elf
-	$(ARMGNU)-objdump -D video01.elf > video01.list
-	$(ARMGNU)-objcopy video01.elf -O ihex video01.hex
-	$(ARMGNU)-objcopy video01.elf -O binary $(TARGET)
+	$(ARMGNU)-ld $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS) -T loader -o $(PROJECTNAME).elf
+	$(ARMGNU)-objdump -D $(PROJECTNAME).elf > $(PROJECTNAME).list
+	$(ARMGNU)-objcopy $(PROJECTNAME).elf -O ihex $(PROJECTNAME).hex
+	$(ARMGNU)-objcopy $(PROJECTNAME).elf -O binary $(TARGET)
