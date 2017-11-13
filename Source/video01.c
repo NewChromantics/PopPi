@@ -15,6 +15,14 @@
 // below to use a different location.
 
 
+#if defined(TARGET_CPP)
+#define CAPI	extern "C"
+extern "C"
+{
+#else
+#define CAPI
+#endif
+
 extern void PUT32 ( unsigned int, unsigned int );
 extern void PUT16 ( unsigned int, unsigned int );
 extern void PUT8 ( unsigned int, unsigned int );
@@ -36,10 +44,15 @@ extern unsigned int timer_tick ( void );
 
 extern void timer_init ( void );
 extern unsigned int timer_tick ( void );
+#if defined(TARGET_CPP)
+}
+#endif
+
 
 typedef unsigned int uint32_t;
 
-unsigned int MailboxWrite ( unsigned int fbinfo_addr, unsigned int channel )
+
+CAPI unsigned int MailboxWrite ( unsigned int fbinfo_addr, unsigned int channel )
 {
     unsigned int mailbox;
 
@@ -52,7 +65,7 @@ unsigned int MailboxWrite ( unsigned int fbinfo_addr, unsigned int channel )
     return(0);
 }
 
-unsigned int MailboxRead ( unsigned int channel )
+CAPI unsigned int MailboxRead ( unsigned int channel )
 {
     unsigned int ra;
     unsigned int mailbox;
@@ -72,10 +85,32 @@ unsigned int MailboxRead ( unsigned int channel )
     }
     return(ra);
 }
+/*
+CAPI void __aeabi_unwind_cpp_pr0(void);
+CAPI void __aeabi_unwind_cpp_pr1(void);
+CAPI void __aeabi_unwind_cpp_pr2(void);
 
+void
+__aeabi_unwind_cpp_pr0(void)
+{
+	//panic("__aeabi_unwind_cpp_pr0");
+}
+
+void
+__aeabi_unwind_cpp_pr1(void)
+{
+	//panic("__aeabi_unwind_cpp_pr1");
+}
+
+void
+__aeabi_unwind_cpp_pr2(void)
+{
+	//panic("__aeabi_unwind_cpp_pr2");
+}
+*/
 
 //------------------------------------------------------------------------
-int notmain ( void )
+CAPI int notmain ( void )
 {
     unsigned int ra,rb;
     unsigned int ry,rx;
@@ -135,7 +170,10 @@ int notmain ( void )
     hexstring(rb);
     ra=0;
 	
-#define RGBA(r,g,b,a)		( ((r)<<0) | ((g)<<8) | ((b)<<16) | ((a)<<24) )
+	
+	//	display is BGRA
+#define BGRA(r,g,b,a)		( ((r)<<0) | ((g)<<8) | ((b)<<16) | ((a)<<24) )
+#define RGBA(r,g,b,a)		( BGRA(b,g,r,a) )
 	
 	for ( int y=0;	y<ScreenHeight;	y++ )
 	{
@@ -143,6 +181,7 @@ int notmain ( void )
 		{
 			uint32_t Table[] =
 			{
+				RGBA(	0,		0,		0,	0 ),
 				RGBA(	255,	0,		0,	0 ),
 				RGBA(	0,		255,	0,	0 ),
 				RGBA(	255,	255,	0,	0 ),
@@ -161,8 +200,8 @@ int notmain ( void )
 			};
 			
 			int TableIndex = y / 50;
-			if ( TableIndex > 15 )
-				TableIndex = 15;
+			if ( TableIndex > 16 )
+				TableIndex = 16;
 			
 			uint32_t bgra = Table[ TableIndex ];
 			if ( x < 10 )
@@ -204,21 +243,6 @@ int notmain ( void )
 
     return(0);
 }
-//-------------------------------------------------------------------------
-//-------------------------------------------------------------------------
 
 
-
-
-//-------------------------------------------------------------------------
-//
-// Copyright (c) 2012 David Welch dwelch@dwelch.com
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
-//-------------------------------------------------------------------------
 
