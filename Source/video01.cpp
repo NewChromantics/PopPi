@@ -103,6 +103,8 @@ public:
 
 	void		SetPixel(int x,int y,uint32_t Colour);
 	void		SetPixel(int Index,uint32_t Colour);
+	void		SetRow(int y,uint32_t Colour);
+	void		FillPixelsGradient();
 	
 public:
 	uint32_t	mWidth;
@@ -121,6 +123,13 @@ TKernel::TKernel()
 	
 	//	set clock speed
 	timer_init();
+	
+	//	enable level 1 cache
+	//	https://www.raspberrypi.org/forums/viewtopic.php?t=16851
+	uint32_t controlRegister;
+	asm volatile ("MRC p15, 0, %0, c1, c0, 0" : "=r" (controlRegister));
+	controlRegister |= 0x1800;
+	asm volatile ("MCR p15, 0, %0, c1, c0, 0" :: "r" (controlRegister));
 }
 
 
@@ -197,6 +206,9 @@ void TDisplay::SetPixel(int Index,uint32_t Colour)
 	Address *= 4;
 	Address += mScreenBufferAddress;
 	
+	//	gr: no perf improvement
+	//uint32_t* Buffer = (uint32_t*)Address;
+	//*Buffer = Colour;
 	PUT32( Address, Colour );
 }
 
@@ -205,6 +217,38 @@ void TDisplay::SetPixel(int x,int y,uint32_t Colour)
 {
 	auto Address = x + (y*mWidth);
 	SetPixel( Address, Colour );
+}
+
+
+void TDisplay::SetRow(int y,uint32_t Colour)
+{
+	auto Start = 0 + ( y * mWidth );
+	auto End = mWidth + ( y * mWidth );
+	auto Address = mScreenBufferAddress + (Start * 4);
+	auto EndAddress = mScreenBufferAddress + (End * 4);
+	
+	for ( ;	Address<EndAddress;	Address+=4 )
+	{
+		PUT32( Address, Colour );
+	}
+}
+
+
+void TDisplay::FillPixelsGradient()
+{
+	auto PixelCount = mHeight * mWidth;
+	
+	uint32_t rgba = RGBA( 0,0,0,255 );
+	auto Address = mScreenBufferAddress;
+	//uint32_t* Buffer = (uint32_t*)Address;
+	
+	for ( int i=0;	i<PixelCount;	i++,Address+=4)//,Buffer++ )
+	{
+		rgba = RGBA(i % 256,255,0,255);
+		PUT32( Address, rgba );
+		//*Buffer = rgba;
+	}
+	
 }
 
 
@@ -253,12 +297,34 @@ protected:
 	uint32_t	mFixed;
 };
 
+namespace  Math
+{
+	template<typename T>
+	T	Min(T a,T b)		{	return (a<b) ? a : b;	}
+
+	template<typename T>
+	T	Max(T a,T b)		{	return (a>b) ? a : b;	}
+}
 
 void DrawScreen(TDisplay& Display,int Tick)
 {
 	auto PixelCount = Display.mHeight * Display.mWidth;
-	Tick %= Display.mHeight;
 	
+	if ( Tick == 0 )
+		Display.FillPixelsGradient();
+	
+	
+	auto LastRow = Tick % Display.mHeight;
+	auto NextRow = (Tick+1) % Display.mHeight;
+	
+	int Green = (Tick / 256) % 256;
+	int Blue = (Tick / (256*256)) % 256;
+	
+	Display.SetRow( LastRow, RGBA(255,Green,Blue,255) );
+	Display.SetRow( NextRow, RGBA(0,0,0,255) );
+	
+	
+	/*
 	for ( int y=0;	y<Display.mHeight;	y++ )
 	{
 		TFixed yf( y );
@@ -270,14 +336,15 @@ void DrawScreen(TDisplay& Display,int Tick)
 			TFixed xf( x );
 			xf /= Display.mWidth;
 			xf *= 256;
-			uint32_t rgba = RGBA( xf.GetInt(), yf.GetInt(), 0, 255 );
+			uint32_t rgba = RGBA( xf.GetInt(), yf.GetInt(), Tick%256, 255 );
 
-			if ( Tick == y )
+			if ( Tick % Display.mHeight == y )
 				rgba = RGBA(0,0,0,255);
 			
 			Display.SetPixel( x, y, rgba );
 		}
 	}
+	 */
 /*
 	for ( int y)
 	
