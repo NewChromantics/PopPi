@@ -261,12 +261,16 @@ void DrawScreen(TDisplay& Display,int Tick)
 	
 	for ( int y=0;	y<Display.mHeight;	y++ )
 	{
+		TFixed yf( y );
+		yf /= Display.mHeight;
+		yf *= 256;
+		
 		for ( int x=0;	x<Display.mWidth;	x++ )
 		{
 			TFixed xf( x );
 			xf /= Display.mWidth;
 			xf *= 256;
-			uint32_t rgba = xf.GetInt() | RGBA(0,0,0,255);
+			uint32_t rgba = RGBA( xf.GetInt(), yf.GetInt(), 0, 255 );
 
 			if ( Tick == y )
 				rgba = RGBA(0,0,0,255);
@@ -372,6 +376,7 @@ CAPI int notmain ( void )
 	while ( true )
 	{
 		DrawScreen( Display, Tick );
+		Tick++;
 	}
 
 
