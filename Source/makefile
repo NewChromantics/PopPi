@@ -1,9 +1,14 @@
 
 ARMGNU ?= arm-none-eabi
-
+TARGET = kernel.img
+PROJECTNAME = PopPi
 COPS = -Wall -O2 -nostdlib -nostartfiles -ffreestanding 
+CPPOPS = -Wall -O2  -nostartfiles -ffreestanding -fno-exceptions
+COBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
+CPPOBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
+SOBJECTS = $(patsubst %.s, %.o, $(wildcard *.s))
 
-gcc : kernel.img
+gcc : $(TARGET)
 
 all : gcc clang
 
@@ -18,51 +23,20 @@ clean :
 	rm -f *.clang.s
 
 
-vectors.o : vectors.s
-	$(ARMGNU)-as vectors.s -o vectors.o
+%.o : %.s
+	$(ARMGNU)-as $< -o $@
 
-video01.o : video01.c 
-	$(ARMGNU)-gcc $(COPS) -c video01.c -o video01.o
+%.o : %.cpp
+	$(ARMGNU)-g++ $(CPPOPS) -c $< -o $@
 
-periph.o : periph.c
-	$(ARMGNU)-gcc $(COPS) -c periph.c -o periph.o
-
-kernel.img : loader vectors.o periph.o video01.o 
-	$(ARMGNU)-ld vectors.o periph.o video01.o -T loader -o video01.elf
-	$(ARMGNU)-objdump -D video01.elf > video01.list
-	$(ARMGNU)-objcopy video01.elf -O ihex video01.hex
-	$(ARMGNU)-objcopy video01.elf -O binary kernel.img
+%.o : %.c
+	$(ARMGNU)-gcc $(COPS) -c $< -o $@
 
 
-
-
-
-
-LOPS = -Wall -m32 -emit-llvm
-LLCOPS0 = -march=arm 
-LLCOPS1 = -march=arm -mcpu=arm1176jzf-s
-LLCOPS = $(LLCOPS1)
-COPS = -Wall  -O2 -nostdlib -nostartfiles -ffreestanding
-OOPS = -std-compile-opts
-
-clang : video01.bin
-
-video01.bc : video01.c 
-	clang $(LOPS) -c video01.c -o video01.bc
-
-periph.bc : periph.c
-	clang $(LOPS) -c periph.c -o periph.bc
-
-video01.clang.elf : loader vectors.o video01.bc periph.bc
-	llvm-link periph.bc video01.bc -o video01.nopt.bc
-	opt $(OOPS) video01.nopt.bc -o video01.opt.bc
-	#llc $(LLCOPS) video01.opt.bc -o video01.clang.s
-	#$(ARMGNU)-as video01.clang.s -o video01.clang.o
-	llc $(LLCOPS) -filetype=obj video01.opt.bc -o video01.clang.o
-	$(ARMGNU)-ld -o video01.clang.elf -T loader vectors.o video01.clang.o
-	$(ARMGNU)-objdump -D video01.clang.elf > video01.clang.list
-
-video01.bin : video01.clang.elf
-	$(ARMGNU)-objcopy video01.clang.elf video01.clang.bin -O binary
-
+$(TARGET) : loader $(COBJECTS) $(CPPOBJECTS) $(SOBJECTS)
+	@echo $(OBJECTS)
+	$(ARMGNU)-ld $(COBJECTS) $(CPPOBJECTS) $(SOBJECTS) -T loader -o $(PROJECTNAME).elf
+	$(ARMGNU)-objdump -D $(PROJECTNAME).elf > $(PROJECTNAME).list
+	$(ARMGNU)-objcopy $(PROJECTNAME).elf -O ihex $(PROJECTNAME).hex
+	$(ARMGNU)-objcopy $(PROJECTNAME).elf -O binary $(TARGET)
 
