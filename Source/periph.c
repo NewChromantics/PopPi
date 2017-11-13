@@ -126,8 +126,13 @@ void  timer_init ( void )
 {
     //0xF9+1 = 250
     //250MHz/250 = 1MHz
-    PUT32(ARM_TIMER_CTL,0x00F90000);
-    PUT32(ARM_TIMER_CTL,0x00F90200);
+	PUT32(ARM_TIMER_CTL,0x00F90000);
+	PUT32(ARM_TIMER_CTL,0x00F90200);
+	
+	//	value from here
+	//	https://www.raspberrypi.org/forums/viewtopic.php?f=72&t=154553
+	PUT32(ARM_TIMER_CTL,0x00000000);
+	//PUT32(ARM_TIMER_CTL,0x00000200);
 }
 //-------------------------------------------------------------------------
 unsigned int timer_tick ( void )
