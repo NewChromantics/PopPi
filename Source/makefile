@@ -1,10 +1,20 @@
-ARMGNU ?= arm-none-eabi
+# gr: brew build doesn't boot :/
+#ARMPATH ?= /usr/local/Cellar/gcc-arm-none-eabi/20160928
+#ARMLIBPATH ?= $(ARMPATH)/lib/gcc/arm-none-eabi/5.4.1/armv7-m
+ARMPATH ?= /Users/graham/devkitPro/devkitARM
+ARMLIBPATH ?= $(ARMPATH)/lib/gcc/arm-none-eabi/7.1.0
+
+ARMGNU ?= $(ARMPATH)/bin/arm-none-eabi-
 
 TARGET = kernel.img
 PROJECTNAME = PopPi
 
 COPS = -Wall -O2 -nostdlib -nostartfiles -ffreestanding 
-CPPOPS = -Wall -O2 -nostdlib -nostartfiles -ffreestanding -fno-exceptions -DTARGET_CPP
+CPPOPS = -Wall -O2 -std=c++11 -nostdlib -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions
+
+LINKOPS = -L$(ARMLIBPATH) -lgcc 
+#-lfplib
+#-lgcc
 
 COBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 CPPOBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
@@ -25,21 +35,24 @@ clean :
 	rm -f *.clang.s
 
 
-vectors.o : vectors.s
-	$(ARMGNU)-as $< -o $@
+%.o : %.s
+	@echo compiling as $<
+	$(ARMGNU)as $< -o $@
 
-periph.o : periph.c
-	$(ARMGNU)-gcc $(COPS) -c $< -o $@
+%.o : %.c
+	@echo compiling gcc $<
+	$(ARMGNU)gcc $(COPS) -c $< -o $@
 
 %.o : %.cpp
-	$(ARMGNU)-g++ $(CPPOPS) -c $< -o $@
+	@echo compiling g++ $<
+	$(ARMGNU)g++ $(CPPOPS) -c $< -o $@
 
 
 $(TARGET) : loader $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS)
 	@echo $(SOBJECTS)
 	@echo $(COBJECTS)
 	@echo $(CPPOBJECTS)
-	$(ARMGNU)-ld $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS) -T loader -o $(PROJECTNAME).elf
-	$(ARMGNU)-objdump -D $(PROJECTNAME).elf > $(PROJECTNAME).list
-	$(ARMGNU)-objcopy $(PROJECTNAME).elf -O ihex $(PROJECTNAME).hex
-	$(ARMGNU)-objcopy $(PROJECTNAME).elf -O binary $(TARGET)
+	$(ARMGNU)ld $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS) $(LINKOPS) -T loader -o $(PROJECTNAME).elf
+	#$(ARMGNU)objdump -D $(PROJECTNAME).elf > $(PROJECTNAME).list
+	#$(ARMGNU)objcopy $(PROJECTNAME).elf -O ihex $(PROJECTNAME).hex
+	$(ARMGNU)objcopy $(PROJECTNAME).elf -O binary $(TARGET)
