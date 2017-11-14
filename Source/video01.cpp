@@ -348,6 +348,11 @@ TDisplay::TDisplay(int Width,int Height) :
 	}
 	*/
 	mScreenBufferAddress = GET32(0x40040020);
+	
+	//	gr: no speed difference
+	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
+	//and r0,$3FFFFFFF ; Convert Mail Box Frame Buffer Pointer From BUS Address To Physical Address ($CXXXXXXX -> $3XXXXXXX)
+	mScreenBufferAddress &= 0x3FFFFFFF;
 }
 
 
