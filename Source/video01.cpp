@@ -23,27 +23,35 @@ extern "C"
 #define CAPI
 #endif
 
-extern void PUT32 ( unsigned int, unsigned int );
-extern void PUT16 ( unsigned int, unsigned int );
-extern void PUT8 ( unsigned int, unsigned int );
-extern unsigned int GET32 ( unsigned int );
-extern unsigned int GETPC ( void );
-extern void BRANCHTO ( unsigned int );
-extern void dummy ( unsigned int );
+	extern void PUT32 ( unsigned int, unsigned int );
+	extern void PUT16 ( unsigned int, unsigned int );
+	extern void PUT8 ( unsigned int, unsigned int );
+	extern unsigned int GET32 ( unsigned int );
+	extern unsigned int GETPC ( void );
+	extern void BRANCHTO ( unsigned int );
+	extern void dummy ( unsigned int );
 
-extern void uart_init ( void );
-extern unsigned int uart_lcr ( void );
-extern void uart_flush ( void );
-extern void uart_send ( unsigned int );
-extern unsigned int uart_recv ( void );
-extern unsigned int uart_check ( void );
-extern void hexstring ( unsigned int );
-extern void hexstrings ( unsigned int );
-extern void timer_init ( void );
-extern unsigned int timer_tick ( void );
+	extern void uart_init ( void );
+	extern unsigned int uart_lcr ( void );
+	extern void uart_flush ( void );
+	extern void uart_send ( unsigned int );
+	extern unsigned int uart_recv ( void );
+	extern unsigned int uart_check ( void );
+	extern void hexstring ( unsigned int );
+	extern void hexstrings ( unsigned int );
+	extern void timer_init ( void );
+	extern unsigned int timer_tick ( void );
 
-extern void timer_init ( void );
-extern unsigned int timer_tick ( void );
+	extern void timer_init ( void );
+	extern unsigned int timer_tick ( void );
+	
+	extern void start_l1cache ( void );
+	extern void stop_l1cache ( void );
+	extern void start_mmu ( unsigned int, unsigned int );
+	extern unsigned int LDREX ( unsigned int, unsigned int );
+	extern unsigned int STREX ( unsigned int, unsigned int, unsigned int );
+	extern unsigned int EXTEST ( unsigned int, unsigned int, unsigned int );
+	
 #if defined(TARGET_CPP)
 }
 #endif
@@ -53,6 +61,37 @@ extern unsigned int timer_tick ( void );
 #define RGBA(r,g,b,a)		( BGRA(b,g,r,a) )
 
 typedef unsigned int uint32_t;
+
+
+
+#define MALLOCBASE   0x00030000
+
+//#define MMUTABLEBASE 0x00100000
+//#define MMUTABLEBASE 0x00200000
+#define MMUTABLEBASE 0x00004000	//	from pizero code	https://github.com/dwelch67/raspberrypi/blob/ec6b9f1b6a2d38d56f0a4a43683db1be01280ae2/boards/pizero/mmu/notmain.c
+
+
+#define MMUTABLESIZE (0x8000)
+#define MMUTABLEMASK ((MMUTABLESIZE-1)>>2)
+
+#define TOP_LEVEL_WORDS (1<<((31-20)+1))
+#define COARSE_TABLE_WORDS (1<<((19-12)+1))
+#define SMALL_TABLE_WORDS (1<<((11-0)+1))
+
+#define SIMPLE_SECTION
+
+
+unsigned int nextfree;
+
+unsigned int next_coarse_offset ( unsigned int x )
+{
+	unsigned int mask;
+	
+	mask=(~0)<<(10-2);
+	mask=~mask;
+	while(x&mask) x++; //lazy brute force
+	return(x);
+}
 
 
 CAPI unsigned int MailboxWrite ( unsigned int fbinfo_addr, unsigned int channel )
@@ -90,6 +129,63 @@ CAPI unsigned int MailboxRead ( unsigned int channel )
 }
 
 
+bool mmu_section(unsigned int add,unsigned int flags)
+{
+	
+#if defined(SIMPLE_SECTION)
+	unsigned int ra;
+	unsigned int rb;
+	unsigned int rc;
+	
+	//bits 31:20 index into the top level table
+	ra=add>>20;
+	rb=MMUTABLEBASE|(ra<<2);
+	rc=(ra<<20)|flags|2;
+	PUT32(rb,rc);
+	return true;
+
+#else
+
+	//unsigned int add_one ( unsigned int add, unsigned int flags )
+	unsigned int ra;
+	unsigned int rb;
+	unsigned int rc;
+	
+	ra=add>>20;
+	rc=MMUTABLEBASE+(ra<<2);
+	rb=GET32(rc);
+	if(rb)
+	{
+		//printf("Address %08X already allocated\n",add);
+		hexstring(add);
+		hexstring(rc);
+		hexstring(rb);
+		hexstring(0xBADADD);
+		return false;
+	}
+	add=ra<<20;
+	
+	rb=next_coarse_offset(nextfree);
+	rc=rb+COARSE_TABLE_WORDS;
+	if(rc>=MMUTABLESIZE)
+	{
+		//printf("Not enough room\n");
+		hexstring(0xBAD);
+		return false;
+	}
+	nextfree=rc;
+	//use course page table pointer on top level table
+	PUT32(MMUTABLEBASE+(ra<<2),(MMUTABLEBASE+(rb<<2))|0x00000001);
+	//fill in the course page table. with small entries
+	for(ra=0;ra<COARSE_TABLE_WORDS;ra++)
+	{
+		PUT32(MMUTABLEBASE+(rb<<2)+(ra<<2),(add+(ra<<12))|0x00000032|flags);
+	}
+	return true;
+#endif
+}
+
+
 class TKernel
 {
 public:
@@ -112,7 +208,10 @@ public:
 	uint32_t	mScreenBufferAddress;
 };
 
-
+void exit(int Error)
+{
+	
+}
 
 TKernel::TKernel()
 {
@@ -124,12 +223,64 @@ TKernel::TKernel()
 	//	set clock speed
 	timer_init();
 	
-	//	enable level 1 cache
+	//	enable level 1 cache (faster!)
 	//	https://www.raspberrypi.org/forums/viewtopic.php?t=16851
+	start_l1cache();
+	/*
 	uint32_t controlRegister;
 	asm volatile ("MRC p15, 0, %0, c1, c0, 0" : "=r" (controlRegister));
 	controlRegister |= 0x1800;
 	asm volatile ("MCR p15, 0, %0, c1, c0, 0" :: "r" (controlRegister));
+	*/
+	
+	//	https://github.com/dwelch67/raspberrypi/tree/master/twain
+	/*
+	//	enable data cache in program space
+	if(add_one(0x00000000,0x0000|8|4)) return(1);
+	if(add_one(0x00100000,0x0000|8|4)) return(1);
+	if(add_one(0x00200000,0x0000|8|4)) return(1);
+	
+	//	disale data cache in program space
+	if(add_one(0x00000000,0x0000)) return(1);
+	if(add_one(0x00100000,0x0000)) return(1);
+	if(add_one(0x00200000,0x0000)) return(1);
+	*/
+	
+	
+#define MMU
+#ifdef MMU
+	/*
+	for(nextfree=0;nextfree<TOP_LEVEL_WORDS;nextfree++)
+		PUT32(MMUTABLEBASE+(nextfree<<2),0);
+	//nextfree=TOP_LEVEL_WORDS;
+	*/
+	//ram used by the stack and the program
+	mmu_section(0x00000000,0x0000|8|4);
+	mmu_section(0x00100000,0x0000|8|4);
+	mmu_section(0x00200000,0x0000|8|4);
+
+	//Memory mapped I/O used by the uart, etc, not cached
+	mmu_section(0x20000000,0x0000);
+	mmu_section(0x20100000,0x0000);
+	mmu_section(0x20200000,0x0000);
+
+	//	turn off mmu for framebuffer
+	mmu_section(0x48000000,0x0000);
+	mmu_section(0x48100000,0x0000);
+	mmu_section(0x48200000,0x0000);
+	//invalidate_tlbs();
+	
+	//start_mmu(MMUTABLEBASE,0x00000001|0x1000|0x0004);
+	/*
+#define EnableDCache	false
+	if ( EnableDCache )
+		start_mmu(MMUTABLEBASE,0x00800005);
+	else
+		start_mmu(MMUTABLEBASE,0x00800001);
+*/
+	
+	
+#endif
 }
 
 
@@ -320,8 +471,11 @@ void DrawScreen(TDisplay& Display,int Tick)
 	int Green = (Tick / 256) % 256;
 	int Blue = (Tick / (256*256)) % 256;
 	
-	Display.SetRow( LastRow, RGBA(255,Green,Blue,255) );
-	Display.SetRow( NextRow, RGBA(0,0,0,255) );
+	for ( int y=0;	y<Display.mHeight;	y++ )
+	{
+		auto rgba = (y == NextRow) ? RGBA(0,0,0,255) : RGBA(255,Green,Blue,255);
+		Display.SetRow( y, rgba );
+	}
 	
 	
 	/*

@@ -56,3 +56,4 @@ $(TARGET) : loader $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS)
 	#$(ARMGNU)objdump -D $(PROJECTNAME).elf > $(PROJECTNAME).list
 	#$(ARMGNU)objcopy $(PROJECTNAME).elf -O ihex $(PROJECTNAME).hex
 	$(ARMGNU)objcopy $(PROJECTNAME).elf -O binary $(TARGET)
+	cp $(TARGET) /Volumes/boot/
