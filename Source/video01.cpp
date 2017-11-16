@@ -96,6 +96,22 @@ unsigned int next_coarse_offset ( unsigned int x )
 	return(x);
 }
 
+//	https://www.raspberrypi.org/forums/viewtopic.php?f=72&t=67970
+typedef struct
+{
+	unsigned int read;		//	0
+	unsigned int unused1;
+	unsigned int unused2;
+	unsigned int unused3;
+	unsigned int poll;		//	16
+	unsigned int sender;	//	20
+	unsigned int status;	//	24
+	unsigned int configuration;	//	28
+	unsigned int write;		//	32
+} Mailbox;
+
+static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
+
 
 CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
 {
@@ -112,39 +128,71 @@ CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
 	
 	//	and bit 1 to say... we're writing it? or because it's the channel?..
 	//	odd that it'll overwrite the display widht, but maybe that has to be aligned or something anyway
+	//	4bits per channel
 	BufferAddress |= 1;
 
     while(1)
     {
-        if((GET32(mailbox+0x18)&0x80000000)==0) break;
+		//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+		//	0x80000000: request successful
+		//	0x80000001: error parsing request buffer (partial response)
+		//uint32_t MailboxResponse = GET32(mailbox+20);
+		uint32_t MailboxResponse = MAILBOX0->sender;
+		
+		//	break when we... have NO response waiting??
+		if( (MailboxResponse & 0x80000000 ) == 0 )
+			break;
     }
 	
-	//	gr: what is this mailbox offset
-    PUT32( mailbox+0x20, BufferAddress );
+	MAILBOX0->write = BufferAddress;
     return(0);
 }
 
 CAPI unsigned int MailboxRead ( unsigned int channel )
 {
-    unsigned int ra;
-    unsigned int mailbox;
-
-    mailbox=0x2000B880;
+    unsigned int mailbox = 0x2000B880;
     while(1)
     {
         while(1)
         {
-            ra=GET32(mailbox+0x18);
-            if((ra&0x40000000)==0) break;
+			uint32_t MailboxResponse = GET32(mailbox+20);
+            if ( ( MailboxResponse & 0x40000000 ) == 0 )
+				break;
         }
-        //hexstrings(ra);
-        ra=GET32(mailbox+0x00);
-        //hexstring(ra);
-        if((ra&0xF)==channel) break;
+
+		auto Response = GET32( mailbox+0x00 );
+		auto CurrentChannelResponse = Response & 0xf;
+        if ( CurrentChannelResponse == channel )
+			return Response;
     }
-    return(ra);
+	
+	//	throw
+	return -1;
 }
 
+bool MailboxEnableQpu(bool Enable=true)
+{
+	uint32_t Data[7] __attribute__ ((aligned(16)));
+	static_assert( sizeof(Data) == 4*7, "sizeof");
+	
+	//	header
+	Data[0] = sizeof(Data);
+	Data[1] = 0x00000000;	//	process request (0 = writing mailbox)
+	Data[2] = 0x30012;		//	the tag id
+	Data[3] = 4;			//	size of the buffer
+	Data[4] = 4;			//	size of the data
+	
+	//	buffer here
+	Data[5] = Enable ? 1 : 0;
+	
+	//	footer
+	Data[6] = 0x00000000;	// end tag
+	
+	//mbox_property(file_desc, p);
+	//return p[5];
+	auto Enabled = (Data[5] == 1);
+	return Enabled;
+}
 
 bool mmu_section(unsigned int add,unsigned int flags)
 {
@@ -372,6 +420,8 @@ TDisplay::TDisplay(int Width,int Height) :
 	
 	FillPixelsCheckerBoard(10);
 	Sleep(1000);
+	
+	MailboxEnableQpu();
 	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
