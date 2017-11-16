@@ -20,9 +20,13 @@ COBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 CPPOBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 SOBJECTS = $(patsubst %.s, %.o, $(wildcard *.s))
 
-gcc : $(TARGET)
+rebuildandupload : rebuild
+	@echo Uploading...
+	curl -v -F file=@$(TARGET) http://flashair.local/upload.cgi
 
-all : gcc
+rebuild : clean build
+
+build : $(TARGET)
 
 clean :
 	rm -f *.o
@@ -56,4 +60,3 @@ $(TARGET) : loader $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS)
 	#$(ARMGNU)objdump -D $(PROJECTNAME).elf > $(PROJECTNAME).list
 	#$(ARMGNU)objcopy $(PROJECTNAME).elf -O ihex $(PROJECTNAME).hex
 	$(ARMGNU)objcopy $(PROJECTNAME).elf -O binary $(TARGET)
-	cp $(TARGET) /Volumes/boot/
