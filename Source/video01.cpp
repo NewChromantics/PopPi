@@ -14,6 +14,9 @@
 // for the SD card work with this bootloader.  Change the ARMBASE
 // below to use a different location.
 
+//#define DRAW_RED
+#define DRAW_GREEN
+#define DRAW_BLUE
 
 #if defined(TARGET_CPP)
 #define CAPI	extern "C"
@@ -284,6 +287,25 @@ TKernel::TKernel()
 #endif
 }
 
+static_assert(sizeof(uint32_t*) == sizeof(uint32_t), "Expecting pointers to be 32bit for mailbox data");
+
+typedef struct TDisplayInfo
+{
+	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-framebuffer-interface
+	uint32_t	mFrameWidth;
+	uint32_t	mFrameHeight;
+	uint32_t	mVirtualWidth;
+	uint32_t	mVirtualHeight;
+	uint32_t	mPitch;			//	output only
+	uint32_t	mBitDepth;
+	uint32_t	mScrollX;
+	uint32_t	mScrollY;
+	uint32_t*	mPixelBuffer;		//	output only
+	uint32_t	mPixelBufferSize;	//	output only (bytes?)
+	
+} __attribute__ ((aligned(16)));
+TDisplayInfo DisplayInfo;
+
 
 TDisplay::TDisplay(int Width,int Height) :
 	mScreenBufferAddress	( 0 ),
@@ -294,21 +316,29 @@ TDisplay::TDisplay(int Width,int Height) :
 	auto ScrollY = 0;
 	auto BitDepth = 32;
 	auto GpuPitch = 0;
-	
+
 //	PERIPHERAL_BASE                = $3F000000 ; Peripheral Base Address
 	//	gr: is this a general ram address?
-	uint32_t MailBoxAddress = 0x40040000;
+	//	https://github.com/raspberrypi/firmware/wiki/Accessing-mailboxes
+	//	if L2 cache is enabled, this address needs to start at 0x40000000
+	uint32_t MailBoxAddress = (uint32_t)(&DisplayInfo);
 	
-	PUT32(MailBoxAddress|0x00, mWidth); /* #0 Physical Width */
-	PUT32(MailBoxAddress|0x04, mHeight); /* #4 Physical Height */
-	PUT32(MailBoxAddress|0x08, mWidth); /* #8 Virtual Width */
-	PUT32(MailBoxAddress|0x0C, mHeight); /* #12 Virtual Height */
-	PUT32(MailBoxAddress|0x10, GpuPitch); /* #16 GPU - Pitch */
-	PUT32(MailBoxAddress|0x14, BitDepth); /* #20 Bit Depth */
-	PUT32(MailBoxAddress|0x18, ScrollX); /* #24 X */
-	PUT32(MailBoxAddress|0x1C, ScrollY); /* #28 Y */
-	PUT32(MailBoxAddress|0x20, 0); /* #32 GPU - Pointer */
-	PUT32(MailBoxAddress|0x24, 0); /* #36 GPU - Size */
+	DisplayInfo.mFrameWidth = mWidth;
+	DisplayInfo.mFrameHeight = mHeight;
+	DisplayInfo.mVirtualWidth = mWidth;
+	DisplayInfo.mVirtualHeight = mHeight;
+	DisplayInfo.mPitch = GpuPitch;
+	DisplayInfo.mBitDepth = BitDepth;
+	DisplayInfo.mScrollX= ScrollX;
+	DisplayInfo.mScrollY = ScrollY;
+	DisplayInfo.mPixelBuffer = nullptr;
+	DisplayInfo.mPixelBufferSize = 0;
+	
+	//	gr: note; not l1cache!
+	//	L2cache enabled
+	MailBoxAddress |= 0x40000000;
+	//	L2cache disabled
+	//MailBoxAddress |= 0xC0000000;
 	
 	//	send this data at this address to mailbox
 	int Channel = 1;
@@ -317,13 +347,13 @@ TDisplay::TDisplay(int Width,int Height) :
 	MailboxRead(Channel);
 
 	//	read new contents of struct
-	mScreenBufferAddress = GET32( MailBoxAddress|0x20 );
+	mScreenBufferAddress = (uint32_t)DisplayInfo.mPixelBuffer;
 	//	todo: if addr=0, loop
 	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
 	//and r0,$3FFFFFFF ; Convert Mail Box Frame Buffer Pointer From BUS Address To Physical Address ($CXXXXXXX -> $3XXXXXXX)
-	mScreenBufferAddress &= 0x3FFFFFFF;
+	//mScreenBufferAddress &= 0x3FFFFFFF;
 	
 	
 	//	all from kernel.asm
@@ -562,7 +592,17 @@ void DrawScreen(TDisplay& Display,int Tick)
 	
 	for ( int y=0;	y<Display.mHeight;	y++ )
 	{
-		auto rgba = (y == NextRow) ? RGBA(0,0,0,255) : RGBA(255,Green,Blue,255);
+#if defined(DRAW_RED)
+		auto rgba = RGBA(255,Green,Blue,255);
+#elif defined(DRAW_GREEN)
+		auto rgba = RGBA(Green,255,Blue,255);
+#elif defined(DRAW_BLUE)
+		auto rgba = RGBA(Green,Blue,255,255);
+#else
+#error DRAW_XXX expected
+#endif
+		if ( y == NextRow )
+			rgba = RGBA(0,0,0,255);
 		Display.SetRow( y, rgba );
 	}
 	
