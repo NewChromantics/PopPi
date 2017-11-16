@@ -103,6 +103,7 @@ CAPI unsigned int MailboxWrite ( unsigned int fbinfo_addr, unsigned int channel 
     {
         if((GET32(mailbox+0x18)&0x80000000)==0) break;
     }
+	//	20 = size, so writing offset
     PUT32(mailbox+0x20,fbinfo_addr+channel);
     return(0);
 }
@@ -247,7 +248,7 @@ TKernel::TKernel()
 	*/
 	
 	
-#define MMU
+//#define MMU
 #ifdef MMU
 	/*
 	for(nextfree=0;nextfree<TOP_LEVEL_WORDS;nextfree++)
@@ -294,66 +295,149 @@ TDisplay::TDisplay(int Width,int Height) :
 	auto BitDepth = 32;
 	auto GpuPitch = 0;
 	
-	PUT32(0x40040000, mWidth); /* #0 Physical Width */
-	PUT32(0x40040004, mHeight); /* #4 Physical Height */
-	PUT32(0x40040008, mWidth); /* #8 Virtual Width */
-	PUT32(0x4004000C, mHeight); /* #12 Virtual Height */
-	PUT32(0x40040010, GpuPitch); /* #16 GPU - Pitch */
-	PUT32(0x40040014, BitDepth); /* #20 Bit Depth */
-	PUT32(0x40040018, ScrollX); /* #24 X */
-	PUT32(0x4004001C, ScrollY); /* #28 Y */
-	PUT32(0x40040020, 0); /* #32 GPU - Pointer */
-	PUT32(0x40040024, 0); /* #36 GPU - Size */
+//	PERIPHERAL_BASE                = $3F000000 ; Peripheral Base Address
+	//	gr: is this a general ram address?
+	uint32_t MailBoxAddress = 0x40040000;
 	
-	//	? commit ram
-	hexstring(MailboxWrite(0x40040000,1));
+	PUT32(MailBoxAddress|0x00, mWidth); /* #0 Physical Width */
+	PUT32(MailBoxAddress|0x04, mHeight); /* #4 Physical Height */
+	PUT32(MailBoxAddress|0x08, mWidth); /* #8 Virtual Width */
+	PUT32(MailBoxAddress|0x0C, mHeight); /* #12 Virtual Height */
+	PUT32(MailBoxAddress|0x10, GpuPitch); /* #16 GPU - Pitch */
+	PUT32(MailBoxAddress|0x14, BitDepth); /* #20 Bit Depth */
+	PUT32(MailBoxAddress|0x18, ScrollX); /* #24 X */
+	PUT32(MailBoxAddress|0x1C, ScrollY); /* #28 Y */
+	PUT32(MailBoxAddress|0x20, 0); /* #32 GPU - Pointer */
+	PUT32(MailBoxAddress|0x24, 0); /* #36 GPU - Size */
+	
+	//	send this data at this address to mailbox
+	int Channel = 1;
+	MailboxWrite(MailBoxAddress,Channel);
 	//	? block until ready
-	hexstring(MailboxRead(1));
+	MailboxRead(Channel);
 
-	
-	//	read/verify meta?
-	/*
-	uint32_t rb=0x40040000;
-	for( auto ra=0;ra<10;ra++)
-	{
-		hexstrings(rb);
-		hexstring(GET32(rb));
-		rb+=4;
-	}
-	*/
-	
-	//	init screen planes?
-	/*
-	rb=GET32(0x40040020);
-	hexstring(rb);
-	for( auto ra=0;ra<10000;ra++)
-	{
-		PUT32(rb,~((ra&0xFF)<<0));
-		rb+=4;
-	}
-	for(auto ra=0;ra<10000;ra++)
-	{
-		PUT32(rb,~((ra&0xFF)<<8));
-		rb+=4;
-	}
-	for(auto ra=0;ra<10000;ra++)
-	{
-		PUT32(rb,~((ra&0xFF)<<16));
-		rb+=4;
-	}
-	for(auto ra=0;ra<10000;ra++)
-	{
-		PUT32(rb,~((ra&0xFF)<<24));
-		rb+=4;
-	}
-	*/
-	mScreenBufferAddress = GET32(0x40040020);
+	//	read new contents of struct
+	mScreenBufferAddress = GET32( MailBoxAddress|0x20 );
+	//	todo: if addr=0, loop
 	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
 	//and r0,$3FFFFFFF ; Convert Mail Box Frame Buffer Pointer From BUS Address To Physical Address ($CXXXXXXX -> $3XXXXXXX)
 	mScreenBufferAddress &= 0x3FFFFFFF;
+	
+	
+	//	all from kernel.asm
+	//	lookup
+	
+	//	assembler has full struct info:
+	//	size
+	//	request/response code
+	//	Set_Physical_Display <--tag
+	/*
+	 align 16
+	 FB_STRUCT: ; Mailbox Property Interface Buffer Structure
+  dw FB_STRUCT_END - FB_STRUCT ; Buffer Size In Bytes (Including The Header Values, The End Tag And Padding)
+  dw $00000000 ; Buffer Request/Response Code
+	 ; Request Codes: $00000000 Process Request Response Codes: $80000000 Request Successful, $80000001 Partial Response
+	 ; Sequence Of Concatenated Tags
+  dw Set_Physical_Display ; Tag Identifier
+  dw $00000008 ; Value Buffer Size In Bytes
+  dw $00000008 ; 1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
+  dw SCREEN_X ; Value Buffer
+  dw SCREEN_Y ; Value Buffer
+	 
+  dw Set_Virtual_Buffer ; Tag Identifier
+  dw $00000008 ; Value Buffer Size In Bytes
+  dw $00000008 ; 1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
+  dw SCREEN_X ; Value Buffer
+  dw SCREEN_Y ; Value Buffer
+	 
+  dw Set_Depth ; Tag Identifier
+  dw $00000004 ; Value Buffer Size In Bytes
+  dw $00000004 ; 1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
+  dw BITS_PER_PIXEL ; Value Buffer
+	 
+  dw Set_Virtual_Offset ; Tag Identifier
+  dw $00000008 ; Value Buffer Size In Bytes
+  dw $00000008 ; 1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
+	 FB_OFFSET_X:
+  dw 0 ; Value Buffer
+	 FB_OFFSET_Y:
+  dw 0 ; Value Buffer
+	 
+  dw Allocate_Buffer ; Tag Identifier
+  dw $00000008 ; Value Buffer Size In Bytes
+  dw $00000008 ; 1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
+	 FB_POINTER:
+  dw 0 ; Value Buffer
+  dw 0 ; Value Buffer
+	 
+	 dw $00000000 ; $0 (End Tag)
+	 FB_STRUCT_END:
+	 
+
+	 */
+	
+#define PERPIPHERAL_BASE	0x3F000000
+#define V3D_BASE	0xC00000	//	; V3D Base Address ($20C00000 PHYSICAL, $7EC00000 BUS)
+/*
+	; Run Binning Control List (Thread 0)
+	imm32 r0,PERIPHERAL_BASE + V3D_BASE ; Load V3D Base Address
+	imm32 r1,CONTROL_LIST_BIN_STRUCT ; Store Control List Executor Binning Thread 0 Current Address
+	str r1,[r0,V3D_CT0CA]
+	imm32 r1,CONTROL_LIST_BIN_END ; Store Control List Executor Binning Thread 0 End Address
+	str r1,[r0,V3D_CT0EA] ; When End Address Is Stored Control List Thread Executes
+*/
+	/*
+	uint32_t* v3dBase = PERPIPHERAL_BASE | V3D_BASE;
+
+	
+	//	gr: this "struct" makes me think its a execute-code start & end address
+	//	gr: and it is!	https://github.com/phire/hackdriver/blob/master/v3d.h
+	v3dBase[V3D_CT0CA] = CONTROL_LIST_BIN_STRUCT;
+	v3dBase[V3D_CT0CE] = CONTROL_LIST_BIN_END;
+	/*
+	 WaitBinControlList: ; Wait For Control List To Execute
+  ldr r1,[r0,V3D_BFC] ; Load Flush Count
+  tst r1,1 ; Test IF PTB Has Flushed All Tile Lists To Memory
+  beq WaitBinControlList
+	 */
+	
+	/*
+	 
+	 ; Run Rendering Control List (Thread 1)
+	 imm32 r1,CONTROL_LIST_RENDER_STRUCT ; Store Control List Executor Rendering Thread 1 Current Address
+	 str r1,[r0,V3D_CT1CA]
+	 imm32 r1,CONTROL_LIST_RENDER_END ; Store Control List Executor Rendering Thread 1 End Address
+	 str r1,[r0,V3D_CT1EA] ; When End Address Is Stored Control List Thread Executes
+	 */
+	/*
+	//	thread control start
+	v3dBase[V3D_CT1CA] = CONTROL_LIST_RENDER_STRUCT;
+	//	thread control end
+	v3dBase[V3D_CT1CE] = CONTROL_LIST_RENDER_END;
+
+	 /*
+	  https://rpiplayground.wordpress.com/2014/05/03/hacking-the-gpu-for-fun-and-profit-pt-1/
+	  Next we do some pointer arithmetic to set the structure fields to point to the proper VC addresses.  To execute a QPU program through the mailbox interface, we pass an array of message structures that contain a pointer to the uniforms to bind to the QPU program and then a pointer to the address of the QPU code to execute:
+	  */
 }
+
+/*
+ align 4
+ CONTROL_LIST_BIN_STRUCT: ; Control List Of Concatenated Control Records & Data Structure (Binning Mode Thread 0)
+ Tile_Binning_Mode_Configuration BIN_ADDRESS, $2000, BIN_BASE, 10, 8, Auto_Initialise_Tile_State_Data_Array ; Tile Binning Mode Configuration (B) (Address, Size, Base Address, Tile Width, Tile Height, Data)
+ Start_Tile_Binning ; Start Tile Binning (Advances State Counter So That Initial State Items Actually Go Into Tile Lists) (B)
+ 
+ Clip_Window 0, 0, SCREEN_X, SCREEN_Y ; Clip Window
+ Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
+ Viewport_Offset 0, 0 ; Viewport Offset
+ NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
+ Indexed_Primitive_List Mode_Triangles + Index_Type_8, 3, VERTEX_LIST, 2 ; Indexed Primitive List (OpenGL)
+ Flush ; Flush (Add Return-From-Sub-List To Tile Lists & Then Flush Tile Lists To Memory) (B)
+ CONTROL_LIST_BIN_END:
+
+ */
 
 
 void TDisplay::SetPixel(int Index,uint32_t Colour)
