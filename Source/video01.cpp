@@ -14,7 +14,7 @@
 // for the SD card work with this bootloader.  Change the ARMBASE
 // below to use a different location.
 
-#define DRAW_RED
+//#define DRAW_RED
 #define DRAW_GREEN
 #define DRAW_BLUE
 
@@ -102,6 +102,8 @@ CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
     unsigned int mailbox = 0x2000B880;
 	
 	uint32_t BufferAddress = (uint32_t)Data;
+	
+	//	map memory address to physical address... so... the cached/physical memory/virtual memory address over the bus
 	//	gr: note; not l1cache!
 	//	L2cache enabled
 	BufferAddress |= 0x40000000;
@@ -216,6 +218,7 @@ public:
 	void		SetPixel(int Index,uint32_t Colour);
 	void		SetRow(int y,uint32_t Colour);
 	void		FillPixelsGradient();
+	void		FillPixelsCheckerBoard(int SquareSize);
 	
 public:
 	uint32_t	mWidth;
@@ -300,7 +303,7 @@ TKernel::TKernel()
 
 static_assert(sizeof(uint32_t*) == sizeof(uint32_t), "Expecting pointers to be 32bit for mailbox data");
 
-typedef struct TDisplayInfo
+struct TDisplayInfo
 {
 	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-framebuffer-interface
 	uint32_t	mFrameWidth;
@@ -315,7 +318,19 @@ typedef struct TDisplayInfo
 	uint32_t	mPixelBufferSize;	//	output only (bytes?)
 	
 } __attribute__ ((aligned(16)));
+
 TDisplayInfo DisplayInfo;
+
+void Sleep(int Ms)
+{
+	static int x=0;
+	Ms *= 10000;
+	while ( Ms > 0 )
+	{
+		Ms--;
+		x++;
+	}
+}
 
 
 TDisplay::TDisplay(int Width,int Height) :
@@ -354,6 +369,9 @@ TDisplay::TDisplay(int Width,int Height) :
 	//	read new contents of struct
 	mScreenBufferAddress = (uint32_t)DisplayInfo.mPixelBuffer;
 	//	todo: if addr=0, loop
+	
+	FillPixelsCheckerBoard(10);
+	Sleep(1000);
 	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
@@ -527,6 +545,29 @@ void TDisplay::FillPixelsGradient()
 }
 
 
+void TDisplay::FillPixelsCheckerBoard(int SquareSize)
+{
+	uint32_t Colours[2];
+	Colours[0] = RGBA( 56,185,255,255 );
+	Colours[1] = RGBA( 199,214,221,255 );
+	
+	auto* Pixels = (uint32_t*)mScreenBufferAddress;
+	for ( unsigned y=0;	y<mHeight;	y++ )
+	{
+		auto yodd = (y/SquareSize) & 1;
+		for ( unsigned x=0;	x<mWidth;	x++ )
+		{
+			auto xodd = (x/SquareSize) & 1;
+			if ( yodd )
+				xodd = !xodd;
+			auto ColourIndex = xodd;
+			int p = x + (y * mWidth);
+			Pixels[p] = Colours[ColourIndex];
+		}
+	}
+}
+
+
 class TFixed
 {
 public:
@@ -583,20 +624,18 @@ namespace  Math
 
 void DrawScreen(TDisplay& Display,int Tick)
 {
-	auto PixelCount = Display.mHeight * Display.mWidth;
-	
-	if ( Tick == 0 )
-		Display.FillPixelsGradient();
-	
-	
 	auto LastRow = Tick % Display.mHeight;
 	auto NextRow = (Tick+1) % Display.mHeight;
 	
-	int Green = (Tick / 256) % 256;
-	int Blue = (Tick / (256*256)) % 256;
+	int Green = (Tick / 100) % 256;
+	int Blue = (Tick / 1000) % 256;
 	
-	for ( int y=0;	y<Display.mHeight;	y++ )
+	for ( unsigned y=0;	y<Display.mHeight;	y++ )
 	{
+		//	only draw new lines
+		if ( y != LastRow && y != NextRow )
+			continue;
+		
 #if defined(DRAW_RED)
 		auto rgba = RGBA(255,Green,Blue,255);
 #elif defined(DRAW_GREEN)
@@ -606,6 +645,7 @@ void DrawScreen(TDisplay& Display,int Tick)
 #else
 #error DRAW_XXX expected
 #endif
+	
 		if ( y == NextRow )
 			rgba = RGBA(0,0,0,255);
 		Display.SetRow( y, rgba );
