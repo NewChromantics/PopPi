@@ -138,12 +138,14 @@ CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
 		//	0x80000001: error parsing request buffer (partial response)
 		//uint32_t MailboxResponse = GET32(mailbox+20);
 		uint32_t MailboxResponse = MAILBOX0->sender;
-		
+#define MAILBOX_STATUS_BUSY 0x80000000
 		//	break when we... have NO response waiting??
-		if( (MailboxResponse & 0x80000000 ) == 0 )
+		bool StatusBusy = (MailboxResponse & MAILBOX_STATUS_BUSY) == MAILBOX_STATUS_BUSY;
+		if( !StatusBusy )
 			break;
     }
 	
+	//	gr: I bet this is configuration
 	MAILBOX0->write = BufferAddress;
     return(0);
 }
@@ -155,11 +157,15 @@ CAPI unsigned int MailboxRead ( unsigned int channel )
     {
         while(1)
         {
-			uint32_t MailboxResponse = GET32(mailbox+20);
-            if ( ( MailboxResponse & 0x40000000 ) == 0 )
+			//	gr: sender, not status, suggests this struct may be off...
+#define MAILBOX_STATUS_EMPTY 0x40000000
+			uint32_t MailboxResponse = MAILBOX0->sender;
+			bool StatusEmpty = (MailboxResponse & MAILBOX_STATUS_EMPTY) == MAILBOX_STATUS_EMPTY;
+            if ( !StatusEmpty )
 				break;
         }
 
+		//	gr: switching this to MAILBOX0->read doesn't work :/
 		auto Response = GET32( mailbox+0x00 );
 		auto CurrentChannelResponse = Response & 0xf;
         if ( CurrentChannelResponse == channel )
