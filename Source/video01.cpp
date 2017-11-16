@@ -323,12 +323,12 @@ TDisplayInfo DisplayInfo;
 
 void Sleep(int Ms)
 {
-	static int x=0;
-	Ms *= 10000;
+	//	random number, tis loop is basicaly "sleep for x ticks" so 250/1000mhz of nops is what we need?
+	Ms *= 1 * 250 * 100;
 	while ( Ms > 0 )
 	{
 		Ms--;
-		x++;
+		asm ("nop");
 	}
 }
 
