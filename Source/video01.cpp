@@ -14,7 +14,7 @@
 // for the SD card work with this bootloader.  Change the ARMBASE
 // below to use a different location.
 
-//#define DRAW_RED
+#define DRAW_RED
 #define DRAW_GREEN
 #define DRAW_BLUE
 
@@ -97,17 +97,28 @@ unsigned int next_coarse_offset ( unsigned int x )
 }
 
 
-CAPI unsigned int MailboxWrite ( unsigned int fbinfo_addr, unsigned int channel )
+CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
 {
-    unsigned int mailbox;
+    unsigned int mailbox = 0x2000B880;
+	
+	uint32_t BufferAddress = (uint32_t)Data;
+	//	gr: note; not l1cache!
+	//	L2cache enabled
+	BufferAddress |= 0x40000000;
+	//	L2cache disabled
+	//MailBoxAddress |= 0xC0000000;
+	
+	//	and bit 1 to say... we're writing it? or because it's the channel?..
+	//	odd that it'll overwrite the display widht, but maybe that has to be aligned or something anyway
+	BufferAddress |= 1;
 
-    mailbox=0x2000B880;
     while(1)
     {
         if((GET32(mailbox+0x18)&0x80000000)==0) break;
     }
-	//	20 = size, so writing offset
-    PUT32(mailbox+0x20,fbinfo_addr+channel);
+	
+	//	gr: what is this mailbox offset
+    PUT32( mailbox+0x20, BufferAddress );
     return(0);
 }
 
@@ -321,7 +332,6 @@ TDisplay::TDisplay(int Width,int Height) :
 	//	gr: is this a general ram address?
 	//	https://github.com/raspberrypi/firmware/wiki/Accessing-mailboxes
 	//	if L2 cache is enabled, this address needs to start at 0x40000000
-	uint32_t MailBoxAddress = (uint32_t)(&DisplayInfo);
 	
 	DisplayInfo.mFrameWidth = mWidth;
 	DisplayInfo.mFrameHeight = mHeight;
@@ -329,20 +339,15 @@ TDisplay::TDisplay(int Width,int Height) :
 	DisplayInfo.mVirtualHeight = mHeight;
 	DisplayInfo.mPitch = GpuPitch;
 	DisplayInfo.mBitDepth = BitDepth;
-	DisplayInfo.mScrollX= ScrollX;
+	DisplayInfo.mScrollX = ScrollX;
 	DisplayInfo.mScrollY = ScrollY;
 	DisplayInfo.mPixelBuffer = nullptr;
 	DisplayInfo.mPixelBufferSize = 0;
 	
-	//	gr: note; not l1cache!
-	//	L2cache enabled
-	MailBoxAddress |= 0x40000000;
-	//	L2cache disabled
-	//MailBoxAddress |= 0xC0000000;
 	
 	//	send this data at this address to mailbox
 	int Channel = 1;
-	MailboxWrite(MailBoxAddress,Channel);
+	MailboxWrite( &DisplayInfo,Channel);
 	//	? block until ready
 	MailboxRead(Channel);
 
