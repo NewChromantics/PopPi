@@ -11,12 +11,15 @@
 		BF7026D51FBDE7D600354F35 /* vectors.s */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; name = vectors.s; path = Source/vectors.s; sourceTree = "<group>"; };
 		BF7026D61FBDE7D600354F35 /* video01.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = video01.cpp; path = Source/video01.cpp; sourceTree = "<group>"; };
 		BF7026D71FBDE7DE00354F35 /* makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; name = makefile; path = Source/makefile; sourceTree = "<group>"; };
+		BF7026DB1FBDEAC600354F35 /* HackDriver */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HackDriver; path = Source/HackDriver; sourceTree = "<group>"; };
+		BF7026DC1FBDEC0C00354F35 /* loader */ = {isa = PBXFileReference; lastKnownFileType = text; name = loader; path = Source/loader; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		BF7026D81FBDE7E000354F35 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				BF7026DC1FBDEC0C00354F35 /* loader */,
 				BF7026D41FBDE7D600354F35 /* periph.c */,
 				BF7026D51FBDE7D600354F35 /* vectors.s */,
 				BF7026D61FBDE7D600354F35 /* video01.cpp */,
@@ -28,6 +31,7 @@
 		BFD306331FBDE78700F650B6 = {
 			isa = PBXGroup;
 			children = (
+				BF7026DB1FBDEAC600354F35 /* HackDriver */,
 				BF7026D81FBDE7E000354F35 /* Source */,
 			);
 			sourceTree = "<group>";
