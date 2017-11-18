@@ -14,7 +14,7 @@
 // for the SD card work with this bootloader.  Change the ARMBASE
 // below to use a different location.
 
-//#define DRAW_RED
+#define DRAW_RED
 //#define DRAW_GREEN
 #define DRAW_BLUE
 
@@ -63,8 +63,14 @@ extern "C"
 #define BGRA(r,g,b,a)		( ((r)<<0) | ((g)<<8) | ((b)<<16) | ((a)<<24) )
 #define RGBA(r,g,b,a)		( BGRA(b,g,r,a) )
 
-typedef unsigned int uint32_t;
 
+typedef unsigned char	uint8_t;
+typedef unsigned int	uint32_t;
+typedef uint32_t		size_t;
+
+#define V3D_IDENT0  		(0x000>>2) // V3D Identification 0 (V3D block identity)
+#define V3D_IDENT0_MAGICNUMBER	0x02443356
+#define V3D_BASE_ADDRESS	0x20c00000
 
 
 #define MALLOCBASE   0x00030000
@@ -113,6 +119,117 @@ typedef struct
 static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
 
 
+
+class TKernel
+{
+public:
+	TKernel();
+	
+	uint8_t*	AllocGpuMemory(uint32_t Size);
+};
+
+
+class TDisplay
+{
+public:
+	TDisplay(int Width,int Height);
+	
+	void		SetPixel(int x,int y,uint32_t Colour);
+	void		SetPixel(int Index,uint32_t Colour);
+	void		SetRow(int y,uint32_t Colour);
+	void		FillPixelsGradient();
+	void		FillPixelsCheckerBoard(int SquareSize);
+	
+protected:
+	void		SetupTileBins();
+	
+public:
+	uint32_t	mWidth;
+	uint32_t	mHeight;
+	uint32_t	mScreenBufferAddress;
+};
+
+
+
+class TGpuMemory;
+
+class TGpuMemoryScopeLock
+{
+public:
+	TGpuMemoryScopeLock(TGpuMemory& Memory);
+	~TGpuMemoryScopeLock();
+	
+public:
+	TGpuMemory&		mMemory;
+};
+
+
+class TGpuMemory
+{
+public:
+	TGpuMemory(uint32_t Size);
+	
+	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
+	void 		Free();
+	uint8_t*	GetMemory()	{	return mAddress;	}
+	void		Lock();
+	void		Unlock();
+	
+private:
+	uint32_t	mHandle;
+	uint8_t*	mAddress;
+};
+
+
+enum class TGpuMemFlags : uint32_t
+{
+	Discardable		= 1<<0,	//	can be resized to 0 at any time. Use for cached data
+	Normal			= 0<<2,	//	normal allocating alias. Don't use from ARM
+	Direct			= 1<<2,	//	0xC alias uncached
+	Coherent		= 2<<2,	//	0x8 alias. Non-allocating in L2 but coherent
+	L1NonAllocating	= Direct | Coherent,	//	Allocating in L2
+	ZeroMemory		= 1<<4,	//	initialise all zero
+	NoInit			= 1<<5,	//	don't initialise (default is initialise to all ones)
+	HintPermalock	= 1<<6,	//	Likely to be locked for long periods of time
+};
+
+constexpr enum TGpuMemFlags operator |(const enum TGpuMemFlags selfValue,const enum TGpuMemFlags inValue)
+{
+	return (enum TGpuMemFlags)(uint32_t(selfValue) | uint32_t(inValue));
+}
+
+
+
+namespace TMailbox
+{
+	enum class TChannel	: uint32_t;
+	enum class TTag		: uint32_t;
+	
+	template<size_t PAYLOADSIZE>
+	void		SetProperty(TTag Tag,TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool Read=true);
+}
+
+
+
+//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+enum class TMailbox::TChannel : uint32_t
+{
+	One		= 1,
+	Gpu		= 8	//	Arm communicating with video controller (ArmToVc)
+};
+	
+enum class TMailbox::TTag : uint32_t
+{
+	AllocGpuMemory	= 0x3000c,
+	FreeGpuMemory	= 0x3000f,
+	LockGpuMemory	= 0x3000d,
+	UnlockGpuMemory	= 0x3000e,
+	
+	SetResolution	= 0x00048003
+};
+		
+
+
 //	some more references for magic nmbers
 //	https://www.raspberrypi.org/forums/viewtopic.php?f=29&t=65596
 //	http://magicsmoke.co.za/?p=284
@@ -120,7 +237,7 @@ static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
 #define MAILBOX_STATUS_EMPTY 0x40000000
 
 
-void MailboxWrite(void* Data,unsigned int Channel)
+void MailboxWrite(void* Data,TMailbox::TChannel Channel)
 {
     unsigned int mailbox = 0x2000B880;
 	
@@ -145,7 +262,7 @@ void MailboxWrite(void* Data,unsigned int Channel)
 	//	4bits per channel
 	//	gr: could be AllocateBuffer command; http://magicsmoke.co.za/?p=284
 	//	gr: why arent we setting all these tags? http://magicsmoke.co.za/?p=284
-	BufferAddress |= Channel;
+	BufferAddress |= static_cast<uint32_t>(Channel);
 
     while(1)
     {
@@ -166,7 +283,7 @@ void MailboxWrite(void* Data,unsigned int Channel)
 	MAILBOX0->write = BufferAddress;
 }
 
-uint32_t MailboxRead(unsigned int Channel)
+uint32_t MailboxRead(TMailbox::TChannel Channel)
 {
 	auto ChannelBitMask = (1<<4)-1;
     unsigned int mailbox = 0x2000B880;
@@ -183,8 +300,8 @@ uint32_t MailboxRead(unsigned int Channel)
 
 		//	gr: switching this to MAILBOX0->read doesn't work :/
 		auto Response = GET32( mailbox+0x00 );
-		auto CurrentChannelResponse = Response & ChannelBitMask;
-        if ( CurrentChannelResponse == Channel )
+		auto ResponseChannel = static_cast<TMailbox::TChannel>( Response & ChannelBitMask );
+        if ( ResponseChannel == Channel )
 		{
 			Response &= ~ChannelBitMask;
 			return Response;
@@ -216,8 +333,7 @@ bool MailboxEnableQpu(bool Enable=true)
 	//	gr: channel 1 doesn't boot properly (screen resets?)
 	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 	//	8 is supposed to be ARM to VC
-	auto Channel = 8;
-	
+	auto Channel = TMailbox::TChannel::Gpu;
 	MailboxWrite( Data, Channel );
 	//	wait for it to finish
 	MailboxRead( Channel );
@@ -229,11 +345,14 @@ bool MailboxEnableQpu(bool Enable=true)
 }
 
 
-#define TAG_SETRESOLUTION	0x00048003
 void SetResolution(uint32_t Width,uint32_t Height)
 {
+	uint32_t Data[2];
+	Data[0] = Width;
+	Data[1] = Height;
+	TMailbox::SetProperty( TMailbox::TTag::SetResolution, TMailbox::TChannel::Gpu, Data );
+	/*
 	uint32_t Data[8] __attribute__ ((aligned(16)));
-	static_assert( sizeof(Data) == 4*7, "sizeof");
 	
 	//	header
 	Data[0] = sizeof(Data);
@@ -252,10 +371,11 @@ void SetResolution(uint32_t Width,uint32_t Height)
 	//	gr: channel 1 doesn't boot properly (screen resets?)
 	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 	//	8 is supposed to be ARM to VC
-	auto Channel = 8;
+	auto Channel = TMailbox::TChannel::Gpu;
 	
 	MailboxWrite( Data, Channel );
 	MailboxRead( Channel );
+	 */
 }
 
 bool mmu_section(unsigned int add,unsigned int flags)
@@ -313,30 +433,6 @@ bool mmu_section(unsigned int add,unsigned int flags)
 	return true;
 #endif
 }
-
-
-class TKernel
-{
-public:
-	TKernel();
-};
-
-class TDisplay
-{
-public:
-	TDisplay(int Width,int Height);
-
-	void		SetPixel(int x,int y,uint32_t Colour);
-	void		SetPixel(int Index,uint32_t Colour);
-	void		SetRow(int y,uint32_t Colour);
-	void		FillPixelsGradient();
-	void		FillPixelsCheckerBoard(int SquareSize);
-	
-public:
-	uint32_t	mWidth;
-	uint32_t	mHeight;
-	uint32_t	mScreenBufferAddress;
-};
 
 void exit(int Error)
 {
@@ -413,6 +509,7 @@ TKernel::TKernel()
 #endif
 }
 
+
 static_assert(sizeof(uint32_t*) == sizeof(uint32_t), "Expecting pointers to be 32bit for mailbox data");
 
 struct TDisplayInfo
@@ -473,10 +570,10 @@ TDisplay::TDisplay(int Width,int Height) :
 	
 	
 	//	send this data at this address to mailbox
-	int Channel = 1;
+	auto Channel = TMailbox::TChannel::One;
 	MailboxWrite( &DisplayInfo,Channel);
 	//	? block until ready
-	MailboxRead(Channel);
+	MailboxRead( Channel );
 
 	//	read new contents of struct
 	mScreenBufferAddress = (uint32_t)DisplayInfo.mPixelBuffer;
@@ -485,9 +582,17 @@ TDisplay::TDisplay(int Width,int Height) :
 	FillPixelsCheckerBoard(10);
 	Sleep(1000);
 	
-	SetResolution( 100, 100 );
-	
 	MailboxEnableQpu(true);
+	auto* V3d = (uint32_t*)V3D_BASE_ADDRESS;
+	auto Magic = V3d[V3D_IDENT0];
+	if ( Magic != V3D_IDENT0_MAGICNUMBER )
+	{
+		//throw;
+	}
+
+	SetResolution( 640, 480 );
+	
+
 	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
@@ -651,7 +756,7 @@ void TDisplay::FillPixelsGradient()
 	auto Address = mScreenBufferAddress;
 	//uint32_t* Buffer = (uint32_t*)Address;
 	
-	for ( int i=0;	i<PixelCount;	i++,Address+=4)//,Buffer++ )
+	for ( unsigned i=0;	i<PixelCount;	i++,Address+=4)//,Buffer++ )
 	{
 		rgba = RGBA(i % 256,255,0,255);
 		PUT32( Address, rgba );
@@ -682,6 +787,13 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 		}
 	}
 }
+
+
+void TDisplay::SetupTileBins()
+{
+	
+}
+
 
 
 class TFixed
@@ -876,6 +988,101 @@ void DrawScreen(TDisplay& Display,int Tick)
  }
  }
  */
+
+	
+
+template<size_t PAYLOADSIZE>
+void TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool ReadData)
+{
+	uint32_t Data[PAYLOADSIZE + 6] __attribute__ ((aligned(16)));
+	
+	Data[0] = sizeof(Data);
+	Data[1] = 0x00000000;	// process request
+	Data[2] = static_cast<uint32_t>( Tag );
+	Data[3] = PAYLOADSIZE * sizeof(uint32_t);	//	size of buffer
+	Data[4] = PAYLOADSIZE * sizeof(uint32_t);	//	size of data
+	for ( unsigned i=0;	i<PAYLOADSIZE;	i++ )
+	{
+		Data[5+i] = Payload[i];
+	}
+	Data[5+PAYLOADSIZE] = 0;	//	end tag
+	
+	//	set data
+	MailboxWrite( Data, Channel );
+	
+	if ( !ReadData )
+		return;
+	
+	MailboxRead( Channel );
+	
+	//	read back and return
+	for ( unsigned i=0;	i<PAYLOADSIZE;	i++ )
+	{
+		Payload[i] = Data[5+i];
+	}
+
+}
+
+	
+
+
+TGpuMemory::TGpuMemory(uint32_t Size) :
+	mHandle		( 0 ),
+	mAddress	( nullptr )
+{
+	auto Align4k = 0x1000;
+	auto Flags = TGpuMemFlags::Coherent | TGpuMemFlags::ZeroMemory;
+	
+	uint32_t Data[3];
+	Data[0] = Size;
+	Data[1] = Align4k;
+	Data[2] = static_cast<uint32_t>(Flags);
+	
+	TMailbox::SetProperty( TMailbox::TTag::AllocGpuMemory, TMailbox::TChannel::Gpu, Data );
+
+	mHandle = Data[0];
+}
+	
+void TGpuMemory::Free()
+{
+	uint32_t Data[1];
+	Data[0] = mHandle;
+	
+	TMailbox::SetProperty( TMailbox::TTag::FreeGpuMemory, TMailbox::TChannel::Gpu, Data );
+}
+
+void TGpuMemory::Lock()
+{
+	uint32_t Data[1];
+	Data[0] = mHandle;
+		
+	TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
+}
+	
+	
+void TGpuMemory::Unlock()
+{
+	uint32_t Data[1];
+	Data[0] = mHandle;
+		
+	TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
+}
+	
+	
+
+TGpuMemoryScopeLock::TGpuMemoryScopeLock(TGpuMemory& Memory) :
+	mMemory	( Memory )
+{
+	mMemory.Lock();
+}
+
+TGpuMemoryScopeLock::~TGpuMemoryScopeLock()
+{
+	mMemory.Unlock();
+}
+
+
+
 
 
 CAPI int notmain ( void )
