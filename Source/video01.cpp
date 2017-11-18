@@ -195,7 +195,7 @@ uint32_t MailboxRead(unsigned int Channel)
 	return -1;
 }
 
-bool MailboxEnableQpu(int Channel,bool Enable=true)
+bool MailboxEnableQpu(bool Enable=true)
 {
 	uint32_t Data[7] __attribute__ ((aligned(16)));
 	static_assert( sizeof(Data) == 4*7, "sizeof");
@@ -203,7 +203,7 @@ bool MailboxEnableQpu(int Channel,bool Enable=true)
 	//	header
 	Data[0] = sizeof(Data);
 	Data[1] = 0x00000000;	//	process request (0 = writing mailbox)
-	Data[2] = 0x30012;		//	the tag id
+	Data[2] = 0x00030012;	//	the tag id
 	Data[3] = 4;			//	size of the buffer
 	Data[4] = 4;			//	size of the data
 	
@@ -213,8 +213,10 @@ bool MailboxEnableQpu(int Channel,bool Enable=true)
 	//	footer
 	Data[6] = 0x00000000;	// end tag
 	
-	//	gr: switched to channel 0 and it booted okay..
-	Channel = 0;
+	//	gr: channel 1 doesn't boot properly (screen resets?)
+	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+	//	8 is supposed to be ARM to VC
+	auto Channel = 8;
 	
 	MailboxWrite( Data, Channel );
 	//	wait for it to finish
@@ -224,6 +226,36 @@ bool MailboxEnableQpu(int Channel,bool Enable=true)
 	//return p[5];
 	auto Enabled = (Data[5] == 1);
 	return Enabled;
+}
+
+
+#define TAG_SETRESOLUTION	0x00048003
+void SetResolution(uint32_t Width,uint32_t Height)
+{
+	uint32_t Data[8] __attribute__ ((aligned(16)));
+	static_assert( sizeof(Data) == 4*7, "sizeof");
+	
+	//	header
+	Data[0] = sizeof(Data);
+	Data[1] = 0x00000000;	//	process request (0 = writing mailbox)
+	Data[2] = TAG_SETRESOLUTION;
+	Data[3] = 8;			//	size of the buffer
+	Data[4] = 8;			//	size of the data
+	
+	//	buffer here
+	Data[5] = Width;
+	Data[6] = Height;
+
+	//	footer
+	Data[7] = 0x00000000;	// end tag
+	
+	//	gr: channel 1 doesn't boot properly (screen resets?)
+	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+	//	8 is supposed to be ARM to VC
+	auto Channel = 8;
+	
+	MailboxWrite( Data, Channel );
+	MailboxRead( Channel );
 }
 
 bool mmu_section(unsigned int add,unsigned int flags)
@@ -453,7 +485,9 @@ TDisplay::TDisplay(int Width,int Height) :
 	FillPixelsCheckerBoard(10);
 	Sleep(1000);
 	
-	MailboxEnableQpu(Channel,true);
+	SetResolution( 100, 100 );
+	
+	MailboxEnableQpu(true);
 	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
