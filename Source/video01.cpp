@@ -15,7 +15,7 @@
 // below to use a different location.
 
 //#define DRAW_RED
-#define DRAW_GREEN
+//#define DRAW_GREEN
 #define DRAW_BLUE
 
 #if defined(TARGET_CPP)
@@ -113,11 +113,25 @@ typedef struct
 static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
 
 
-CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
+//	some more references for magic nmbers
+//	https://www.raspberrypi.org/forums/viewtopic.php?f=29&t=65596
+//	http://magicsmoke.co.za/?p=284
+#define MAILBOX_STATUS_BUSY 0x80000000
+#define MAILBOX_STATUS_EMPTY 0x40000000
+
+
+void MailboxWrite(void* Data,unsigned int Channel)
 {
     unsigned int mailbox = 0x2000B880;
 	
 	uint32_t BufferAddress = (uint32_t)Data;
+	
+	auto ChannelBitMask = (1<<4)-1;
+	if ( BufferAddress & ChannelBitMask )
+	{
+		//	throw
+		BufferAddress &= ~ChannelBitMask;
+	}
 	
 	//	map memory address to physical address... so... the cached/physical memory/virtual memory address over the bus
 	//	gr: note; not l1cache!
@@ -129,7 +143,9 @@ CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
 	//	and bit 1 to say... we're writing it? or because it's the channel?..
 	//	odd that it'll overwrite the display widht, but maybe that has to be aligned or something anyway
 	//	4bits per channel
-	BufferAddress |= 1;
+	//	gr: could be AllocateBuffer command; http://magicsmoke.co.za/?p=284
+	//	gr: why arent we setting all these tags? http://magicsmoke.co.za/?p=284
+	BufferAddress |= Channel;
 
     while(1)
     {
@@ -138,27 +154,27 @@ CAPI unsigned int MailboxWrite(void* Data,unsigned int channel )
 		//	0x80000001: error parsing request buffer (partial response)
 		//uint32_t MailboxResponse = GET32(mailbox+20);
 		uint32_t MailboxResponse = MAILBOX0->sender;
-#define MAILBOX_STATUS_BUSY 0x80000000
 		//	break when we... have NO response waiting??
 		bool StatusBusy = (MailboxResponse & MAILBOX_STATUS_BUSY) == MAILBOX_STATUS_BUSY;
 		if( !StatusBusy )
 			break;
     }
 	
+	//	gr: where is
+	
 	//	gr: I bet this is configuration
 	MAILBOX0->write = BufferAddress;
-    return(0);
 }
 
-CAPI unsigned int MailboxRead ( unsigned int channel )
+uint32_t MailboxRead(unsigned int Channel)
 {
+	auto ChannelBitMask = (1<<4)-1;
     unsigned int mailbox = 0x2000B880;
     while(1)
     {
         while(1)
         {
 			//	gr: sender, not status, suggests this struct may be off...
-#define MAILBOX_STATUS_EMPTY 0x40000000
 			uint32_t MailboxResponse = MAILBOX0->sender;
 			bool StatusEmpty = (MailboxResponse & MAILBOX_STATUS_EMPTY) == MAILBOX_STATUS_EMPTY;
             if ( !StatusEmpty )
@@ -167,16 +183,19 @@ CAPI unsigned int MailboxRead ( unsigned int channel )
 
 		//	gr: switching this to MAILBOX0->read doesn't work :/
 		auto Response = GET32( mailbox+0x00 );
-		auto CurrentChannelResponse = Response & 0xf;
-        if ( CurrentChannelResponse == channel )
+		auto CurrentChannelResponse = Response & ChannelBitMask;
+        if ( CurrentChannelResponse == Channel )
+		{
+			Response &= ~ChannelBitMask;
 			return Response;
+		}
     }
 	
 	//	throw
 	return -1;
 }
 
-bool MailboxEnableQpu(bool Enable=true)
+bool MailboxEnableQpu(int Channel,bool Enable=true)
 {
 	uint32_t Data[7] __attribute__ ((aligned(16)));
 	static_assert( sizeof(Data) == 4*7, "sizeof");
@@ -193,6 +212,13 @@ bool MailboxEnableQpu(bool Enable=true)
 	
 	//	footer
 	Data[6] = 0x00000000;	// end tag
+	
+	//	gr: switched to channel 0 and it booted okay..
+	Channel = 0;
+	
+	MailboxWrite( Data, Channel );
+	//	wait for it to finish
+	MailboxRead( Channel );
 	
 	//mbox_property(file_desc, p);
 	//return p[5];
@@ -427,7 +453,7 @@ TDisplay::TDisplay(int Width,int Height) :
 	FillPixelsCheckerBoard(10);
 	Sleep(1000);
 	
-	MailboxEnableQpu();
+	MailboxEnableQpu(Channel,true);
 	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
