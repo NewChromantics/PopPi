@@ -249,8 +249,8 @@ public:
 	void		FillPixelsGradient();
 	void		FillPixelsCheckerBoard(int SquareSize);
 	
-	void		DrawBits(uint32_t Bits);
-	void		DrawNumber(int x,int y,int Char);
+	void		DrawNumber(int x,int y,int Number);
+	void		DrawChar(int x,int y,int Char);
 
 protected:
 	void		SetupGpu();
@@ -971,11 +971,12 @@ void TDisplay::SetRow(int y,uint32_t Colour)
 
 
 #define SPRITE_WIDTH	5
-#define SPRITE_HEIGHT	6
+#define SPRITE_HEIGHT	7
 int Sprite_0[] =
 {
 	2,2,2,2,2,
 	2,1,1,1,2,
+	2,1,2,1,2,
 	2,1,2,1,2,
 	2,1,2,1,2,
 	2,1,1,1,2,
@@ -985,11 +986,95 @@ int Sprite_1[] =
 {
 	2,2,2,2,0,
 	2,1,1,2,0,
+	2,2,1,2,0,
 	0,2,1,2,0,
 	2,2,1,2,2,
 	2,1,1,1,2,
 	2,2,2,2,2,
 };
+int Sprite_2[] =
+{
+	2,2,2,2,2,
+	2,1,1,1,2,
+	2,2,2,1,2,
+	2,1,1,1,2,
+	2,1,2,2,2,
+	2,1,1,1,2,
+	2,2,2,2,2,
+};
+	int Sprite_3[] =
+	{
+		2,2,2,2,0,
+		2,1,1,2,2,
+		2,2,2,1,2,
+		2,1,1,2,2,
+		2,2,2,1,2,
+		2,1,1,2,2,
+		2,2,2,2,0,
+	};
+	int Sprite_4[] =
+	{
+		2,2,2,2,2,
+		2,1,2,1,2,
+		2,1,2,1,2,
+		2,1,1,1,2,
+		2,2,2,1,2,
+		0,0,2,1,2,
+		0,0,2,2,2,
+	};
+	int Sprite_5[] =
+	{
+		2,2,2,2,2,
+		2,1,1,1,2,
+		2,1,2,2,2,
+		2,1,1,1,2,
+		2,2,2,1,2,
+		2,1,1,1,2,
+		2,2,2,2,2,
+	};
+	int Sprite_6[] =
+	{
+		2,2,2,0,0,
+		2,1,2,0,0,
+		2,1,2,2,2,
+		2,1,1,1,2,
+		2,1,2,1,2,
+		2,1,1,1,2,
+		2,2,2,2,2,
+	};
+	int Sprite_7[] =
+	{
+		2,2,2,2,2,
+		2,1,1,1,2,
+		2,2,2,1,2,
+		0,2,1,1,2,
+		0,2,2,1,2,
+		0,0,2,1,2,
+		0,0,2,2,2,
+	};
+	int Sprite_8[] =
+	{
+		2,2,2,2,2,
+		2,1,1,1,2,
+		2,1,2,1,2,
+		2,1,1,1,2,
+		2,1,2,1,2,
+		2,1,1,1,2,
+		2,2,2,2,2,
+	};
+	int Sprite_9[] =
+	{
+		2,2,2,2,2,
+		2,1,1,1,2,
+		2,1,2,1,2,
+		2,1,1,1,2,
+		2,2,2,1,2,
+		0,0,2,1,2,
+		0,0,2,2,2,
+	};
+	
+	
+
 uint32_t Sprite_Palette[3] =
 	{
 		RGBA( 255,0,255,0 ),
@@ -998,9 +1083,22 @@ uint32_t Sprite_Palette[3] =
 	};
 	
 
-void TDisplay::DrawNumber(int x,int y,int Char)
+void TDisplay::DrawChar(int x,int y,int Char)
 {
-	auto* Sprite = (Char == 0) ? Sprite_0 : Sprite_1;
+	const int* SpriteTable[10] =
+	{
+		Sprite_0,
+		Sprite_1,
+		Sprite_2,
+		Sprite_3,
+		Sprite_4,
+		Sprite_5,
+		Sprite_6,
+		Sprite_7,
+		Sprite_8,
+		Sprite_9,
+	};
+	auto* Sprite = SpriteTable[Char];
 	
 	for ( int row=0;	row<SPRITE_HEIGHT;	row++ )
 	{
@@ -1017,16 +1115,24 @@ void TDisplay::DrawNumber(int x,int y,int Char)
 	}
 
 }
-	
 
-void TDisplay::DrawBits(uint32_t Bits)
+
+void TDisplay::DrawNumber(int x,int y,int Number)
 {
-	int y = mHeight - SPRITE_HEIGHT - 4;
-	int x = 1;
-	for ( int i=0;	i<32;	i++ )
+	int Digits[20];
+	Digits[0] = 0;
+	int DigitCount = 0;
+	while ( Number > 0 && DigitCount < 20 )
 	{
-		auto Set = bool_cast(Bits & (1<<0));
-		DrawNumber( x, y, Set ? 1 : 0 );
+		Digits[DigitCount] = Number % 10;
+		DigitCount++;
+		Number /= 10;
+	};
+	
+	for ( int i=DigitCount-1;	i>=0;	i-- )
+	{
+		auto Digit = Digits[i];
+		DrawChar( x, y, Digit );
 		x += SPRITE_WIDTH + 1;
 	}
 	
@@ -1087,6 +1193,8 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 			Pixels[p] = Colours[ColourIndex];
 		}
 	}
+	
+	DrawNumber( 1,1,1234567890);
 }
 
 
@@ -1356,7 +1464,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 	addshort( &Program, mWidth );
 	addshort( &Program, mHeight );
 	addshort( &Program, Frame_Buffer_Color_Format_RGBA8888 );
-	
+
 	//	Tile_Coordinates
 	addbyte( &Program, 115 );
 	addbyte( &Program, 0 );
@@ -1387,7 +1495,6 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 			addbyte( &Program, 0x11 );
 			addword( &Program, (uint32_t)Address );
 			
-			
 			bool LastTile = (tx==TILE_WIDTH-1) && (ty==TILE_HEIGHT-1);
 			if ( LastTile )
 			{
@@ -1400,6 +1507,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 			}
 		}
 	}
+	
 	addbyte(&Program, 0x5);	//	flush all state
 	
 	
@@ -1428,7 +1536,10 @@ bool TDisplay::SetupRenderControl()
 		if ( State == Error )
 		{
 			auto ErrorStat = ReadV3dReg( V3D_ERRSTAT );
-			DrawBits(ErrorStat);
+			int y = mHeight - SPRITE_HEIGHT - 4;
+			int x = 1;
+
+			DrawNumber(x,y,ErrorStat);
 			return false;
 		}
 		
