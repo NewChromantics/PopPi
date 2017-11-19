@@ -22,7 +22,8 @@ SOBJECTS = $(patsubst %.s, %.o, $(wildcard *.s))
 
 rebuildandupload : rebuild
 	@echo Uploading...
-	curl -v -F file=@$(TARGET) http://flashair.local/upload.cgi
+#curl -v -F file=@$(TARGET) http://flashair.local/upload.cgi
+	curl -v -F file=@$(TARGET) http://192.168.0.19/upload.cgi
 
 rebuild : clean build
 

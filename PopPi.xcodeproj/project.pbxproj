@@ -13,6 +13,12 @@
 		BF7026D71FBDE7DE00354F35 /* makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; name = makefile; path = Source/makefile; sourceTree = "<group>"; };
 		BF7026DB1FBDEAC600354F35 /* HackDriver */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HackDriver; path = Source/HackDriver; sourceTree = "<group>"; };
 		BF7026DC1FBDEC0C00354F35 /* loader */ = {isa = PBXFileReference; lastKnownFileType = text; name = loader; path = Source/loader; sourceTree = "<group>"; };
+		BF7026DD1FC1016400354F35 /* kernel.asm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.asm.asm; name = kernel.asm; path = asm/kernel.asm; sourceTree = "<group>"; };
+		BF7026DE1FC101E900354F35 /* CONTROL_LIST.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = CONTROL_LIST.INC; path = asm/LIB/CONTROL_LIST.INC; sourceTree = "<group>"; };
+		BF7026DF1FC101E900354F35 /* FASMARM.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = FASMARM.INC; path = asm/LIB/FASMARM.INC; sourceTree = "<group>"; };
+		BF7026E01FC101E900354F35 /* R_PI.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = R_PI.INC; path = asm/LIB/R_PI.INC; sourceTree = "<group>"; };
+		BF7026E11FC101E900354F35 /* R_PI2.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = R_PI2.INC; path = asm/LIB/R_PI2.INC; sourceTree = "<group>"; };
+		BF7026E21FC101E900354F35 /* V3D.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = V3D.INC; path = asm/LIB/V3D.INC; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -31,6 +37,12 @@
 		BFD306331FBDE78700F650B6 = {
 			isa = PBXGroup;
 			children = (
+				BF7026DD1FC1016400354F35 /* kernel.asm */,
+				BF7026DE1FC101E900354F35 /* CONTROL_LIST.INC */,
+				BF7026DF1FC101E900354F35 /* FASMARM.INC */,
+				BF7026E01FC101E900354F35 /* R_PI.INC */,
+				BF7026E11FC101E900354F35 /* R_PI2.INC */,
+				BF7026E21FC101E900354F35 /* V3D.INC */,
 				BF7026DB1FBDEAC600354F35 /* HackDriver */,
 				BF7026D81FBDE7E000354F35 /* Source */,
 			);

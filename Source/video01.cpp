@@ -14,7 +14,7 @@
 // for the SD card work with this bootloader.  Change the ARMBASE
 // below to use a different location.
 
-#define DRAW_RED
+//#define DRAW_RED
 //#define DRAW_GREEN
 #define DRAW_BLUE
 
@@ -65,12 +65,16 @@ extern "C"
 
 
 typedef unsigned char	uint8_t;
+typedef unsigned short	uint16_t;
 typedef unsigned int	uint32_t;
 typedef uint32_t		size_t;
 
 #define V3D_IDENT0  		(0x000>>2) // V3D Identification 0 (V3D block identity)
 #define V3D_IDENT0_MAGICNUMBER	0x02443356
-#define V3D_BASE_ADDRESS	0x20c00000
+
+//	gr: if I use 3F... nop execution doesnt finish...
+#define V3D_BASE_ADDRESS	(0x20000000 | 0xc00000)	//	pi1
+//#define V3D_BASE_ADDRESS	(0x3F000000 | 0xc00000)	//	pi2
 
 
 #define MALLOCBASE   0x00030000
@@ -88,6 +92,20 @@ typedef uint32_t		size_t;
 #define SMALL_TABLE_WORDS (1<<((11-0)+1))
 
 #define SIMPLE_SECTION
+
+
+#define V3D_CT0CS   (0x100>>2) // Control List Executor Thread 0 Control and Status.
+#define V3D_CT1CS   (0x104>>2) // Control List Executor Thread 1 Control and Status.
+#define V3D_CT0EA   (0x108>>2) // Control List Executor Thread 0 End Address.
+#define V3D_CT1EA   (0x10c>>2) // Control List Executor Thread 1 End Address.
+#define V3D_CT0CA   (0x110>>2) // Control List Executor Thread 0 Current Address.
+#define V3D_CT1CA   (0x114>>2) // Control List Executor Thread 1 Current Address.
+#define V3D_CT00RA0 (0x118>>2) // Control List Executor Thread 0 Return Address.
+#define V3D_CT01RA0 (0x11c>>2) // Control List Executor Thread 1 Return Address.
+#define V3D_CT0LC   (0x120>>2) // Control List Executor Thread 0 List Counter
+#define V3D_CT1LC   (0x124>>2) // Control List Executor Thread 1 List Counter
+#define V3D_CT0PC   (0x128>>2) // Control List Executor Thread 0 Primitive List Counter
+#define V3D_CT1PC   (0x12c>>2) // Control List Executor Thread 1 Primitive List Counter
 
 
 unsigned int nextfree;
@@ -119,6 +137,8 @@ typedef struct
 static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
 
 
+enum class TGpuThread : uint32_t;
+
 
 class TKernel
 {
@@ -132,16 +152,24 @@ public:
 class TDisplay
 {
 public:
-	TDisplay(int Width,int Height);
+	TDisplay(int Width,int Height,bool EnableGpu);
 	
+	void		SetResolution(uint32_t Width,uint32_t Height);
+
 	void		SetPixel(int x,int y,uint32_t Colour);
 	void		SetPixel(int Index,uint32_t Colour);
 	void		SetRow(int y,uint32_t Colour);
+	void		FillPixels(uint32_t Colour);
 	void		FillPixelsGradient();
 	void		FillPixelsCheckerBoard(int SquareSize);
 	
 protected:
-	void		SetupTileBins();
+	void		SetupGpu();
+	template<typename LAMBDA>
+	void		GpuExecute(volatile uint32_t* v3d,size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread);
+	void		GpuNopTest(volatile uint32_t* v3d);
+	void		RenderTriangle(volatile uint32_t* v3d);
+
 	
 public:
 	uint32_t	mWidth;
@@ -149,19 +177,11 @@ public:
 	uint32_t	mScreenBufferAddress;
 };
 
+void DrawScreen(TDisplay& Display,int Tick);
 
 
 class TGpuMemory;
 
-class TGpuMemoryScopeLock
-{
-public:
-	TGpuMemoryScopeLock(TGpuMemory& Memory);
-	~TGpuMemoryScopeLock();
-	
-public:
-	TGpuMemory&		mMemory;
-};
 
 
 class TGpuMemory
@@ -171,13 +191,11 @@ public:
 	
 	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
 	void 		Free();
-	uint8_t*	GetMemory()	{	return mAddress;	}
-	void		Lock();
+	uint8_t*	Lock();
 	void		Unlock();
 	
 private:
 	uint32_t	mHandle;
-	uint8_t*	mAddress;
 };
 
 
@@ -197,6 +215,12 @@ constexpr enum TGpuMemFlags operator |(const enum TGpuMemFlags selfValue,const e
 {
 	return (enum TGpuMemFlags)(uint32_t(selfValue) | uint32_t(inValue));
 }
+
+enum class TGpuThread : uint32_t
+{
+	Thread0		= 0,
+	Thread1		= 1,
+};
 
 
 
@@ -225,7 +249,9 @@ enum class TMailbox::TTag : uint32_t
 	LockGpuMemory	= 0x3000d,
 	UnlockGpuMemory	= 0x3000e,
 	
-	SetResolution	= 0x00048003
+	SetResolution	= 0x00048003,
+
+	SetClockRate	= 0x00038002
 };
 		
 
@@ -345,7 +371,7 @@ bool MailboxEnableQpu(bool Enable=true)
 }
 
 
-void SetResolution(uint32_t Width,uint32_t Height)
+void TDisplay::SetResolution(uint32_t Width,uint32_t Height)
 {
 	uint32_t Data[2];
 	Data[0] = Width;
@@ -542,11 +568,12 @@ void Sleep(int Ms)
 }
 
 
-TDisplay::TDisplay(int Width,int Height) :
+TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	mScreenBufferAddress	( 0 ),
 	mWidth					( Width ),
 	mHeight					( Height )
 {
+	
 	auto ScrollX = 0;
 	auto ScrollY = 0;
 	auto BitDepth = 32;
@@ -578,27 +605,32 @@ TDisplay::TDisplay(int Width,int Height) :
 	//	read new contents of struct
 	mScreenBufferAddress = (uint32_t)DisplayInfo.mPixelBuffer;
 	//	todo: if addr=0, loop
-	
-	FillPixelsCheckerBoard(10);
-	Sleep(1000);
-	
-	MailboxEnableQpu(true);
-	auto* V3d = (uint32_t*)V3D_BASE_ADDRESS;
-	auto Magic = V3d[V3D_IDENT0];
-	if ( Magic != V3D_IDENT0_MAGICNUMBER )
-	{
-		//throw;
-	}
 
-	SetResolution( 640, 480 );
-	
-
-	
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
 	//and r0,$3FFFFFFF ; Convert Mail Box Frame Buffer Pointer From BUS Address To Physical Address ($CXXXXXXX -> $3XXXXXXX)
-	//mScreenBufferAddress &= 0x3FFFFFFF;
+	mScreenBufferAddress &= 0x3FFFFFFF;
+
 	
+	FillPixelsCheckerBoard(10);
+	
+	//	testing
+	//Sleep(2000);
+	//SetResolution( 600, 600 );
+
+	if ( EnableGpu )
+	{
+		Sleep(2000);
+	
+	
+		SetupGpu();
+	
+		Sleep(2000);
+		//	see if we have control again or if setup is stuck
+		DrawScreen( *this, 100 );
+		
+		Sleep(2000);
+	}
 	
 	//	all from kernel.asm
 	//	lookup
@@ -649,28 +681,28 @@ TDisplay::TDisplay(int Width,int Height) :
 	 dw $00000000 ; $0 (End Tag)
 	 FB_STRUCT_END:
 	 
-
+	 
 	 */
 	
 #define PERPIPHERAL_BASE	0x3F000000
 #define V3D_BASE	0xC00000	//	; V3D Base Address ($20C00000 PHYSICAL, $7EC00000 BUS)
-/*
-	; Run Binning Control List (Thread 0)
-	imm32 r0,PERIPHERAL_BASE + V3D_BASE ; Load V3D Base Address
-	imm32 r1,CONTROL_LIST_BIN_STRUCT ; Store Control List Executor Binning Thread 0 Current Address
-	str r1,[r0,V3D_CT0CA]
-	imm32 r1,CONTROL_LIST_BIN_END ; Store Control List Executor Binning Thread 0 End Address
-	str r1,[r0,V3D_CT0EA] ; When End Address Is Stored Control List Thread Executes
-*/
 	/*
-	uint32_t* v3dBase = PERPIPHERAL_BASE | V3D_BASE;
-
-	
-	//	gr: this "struct" makes me think its a execute-code start & end address
-	//	gr: and it is!	https://github.com/phire/hackdriver/blob/master/v3d.h
-	v3dBase[V3D_CT0CA] = CONTROL_LIST_BIN_STRUCT;
-	v3dBase[V3D_CT0CE] = CONTROL_LIST_BIN_END;
+	 ; Run Binning Control List (Thread 0)
+	 imm32 r0,PERIPHERAL_BASE + V3D_BASE ; Load V3D Base Address
+	 imm32 r1,CONTROL_LIST_BIN_STRUCT ; Store Control List Executor Binning Thread 0 Current Address
+	 str r1,[r0,V3D_CT0CA]
+	 imm32 r1,CONTROL_LIST_BIN_END ; Store Control List Executor Binning Thread 0 End Address
+	 str r1,[r0,V3D_CT0EA] ; When End Address Is Stored Control List Thread Executes
+	 */
 	/*
+	 uint32_t* v3dBase = PERPIPHERAL_BASE | V3D_BASE;
+	 
+	 
+	 //	gr: this "struct" makes me think its a execute-code start & end address
+	 //	gr: and it is!	https://github.com/phire/hackdriver/blob/master/v3d.h
+	 v3dBase[V3D_CT0CA] = CONTROL_LIST_BIN_STRUCT;
+	 v3dBase[V3D_CT0CE] = CONTROL_LIST_BIN_END;
+	 /*
 	 WaitBinControlList: ; Wait For Control List To Execute
   ldr r1,[r0,V3D_BFC] ; Load Flush Count
   tst r1,1 ; Test IF PTB Has Flushed All Tile Lists To Memory
@@ -686,33 +718,121 @@ TDisplay::TDisplay(int Width,int Height) :
 	 str r1,[r0,V3D_CT1EA] ; When End Address Is Stored Control List Thread Executes
 	 */
 	/*
-	//	thread control start
-	v3dBase[V3D_CT1CA] = CONTROL_LIST_RENDER_STRUCT;
-	//	thread control end
-	v3dBase[V3D_CT1CE] = CONTROL_LIST_RENDER_END;
-
+	 //	thread control start
+	 v3dBase[V3D_CT1CA] = CONTROL_LIST_RENDER_STRUCT;
+	 //	thread control end
+	 v3dBase[V3D_CT1CE] = CONTROL_LIST_RENDER_END;
+	 
 	 /*
-	  https://rpiplayground.wordpress.com/2014/05/03/hacking-the-gpu-for-fun-and-profit-pt-1/
-	  Next we do some pointer arithmetic to set the structure fields to point to the proper VC addresses.  To execute a QPU program through the mailbox interface, we pass an array of message structures that contain a pointer to the uniforms to bind to the QPU program and then a pointer to the address of the QPU code to execute:
-	  */
+	 https://rpiplayground.wordpress.com/2014/05/03/hacking-the-gpu-for-fun-and-profit-pt-1/
+	 Next we do some pointer arithmetic to set the structure fields to point to the proper VC addresses.  To execute a QPU program through the mailbox interface, we pass an array of message structures that contain a pointer to the uniforms to bind to the QPU program and then a pointer to the address of the QPU code to execute:
+	 */
+}
+	
+	/*
+	 align 4
+	 CONTROL_LIST_BIN_STRUCT: ; Control List Of Concatenated Control Records & Data Structure (Binning Mode Thread 0)
+	 Tile_Binning_Mode_Configuration BIN_ADDRESS, $2000, BIN_BASE, 10, 8, Auto_Initialise_Tile_State_Data_Array ; Tile Binning Mode Configuration (B) (Address, Size, Base Address, Tile Width, Tile Height, Data)
+	 Start_Tile_Binning ; Start Tile Binning (Advances State Counter So That Initial State Items Actually Go Into Tile Lists) (B)
+	 
+	 Clip_Window 0, 0, SCREEN_X, SCREEN_Y ; Clip Window
+	 Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
+	 Viewport_Offset 0, 0 ; Viewport Offset
+	 NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
+	 Indexed_Primitive_List Mode_Triangles + Index_Type_8, 3, VERTEX_LIST, 2 ; Indexed Primitive List (OpenGL)
+	 Flush ; Flush (Add Return-From-Sub-List To Tile Lists & Then Flush Tile Lists To Memory) (B)
+	 CONTROL_LIST_BIN_END:
+	 
+	 */
+
+
+	
+	
+#define VC_INSTRUCTION_NOP	1
+#define VC_INSTRUCTION_HALT	0
+	
+void TDisplay::SetupGpu()
+{
+	auto* v3d = (volatile uint32_t*)V3D_BASE_ADDRESS;
+	
+	//	set clock rate
+	//	gr: asm seems wrong..
+	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+	{
+		auto CLK_V3D_ID = 5;
+		uint32_t Data[3];
+		Data[0] = CLK_V3D_ID;
+		Data[1] = 250*1000*1000;
+		Data[2] = 1;	//	skip turbo
+		TMailbox::SetProperty( TMailbox::TTag::SetClockRate, TMailbox::TChannel::Gpu, Data );
+	}
+	
+	
+	MailboxEnableQpu(true);
+	auto Magic = v3d[V3D_IDENT0];
+	if ( Magic != V3D_IDENT0_MAGICNUMBER )
+	{
+		FillPixels( RGBA(255,0,0,255) );
+		return;
+		//throw;
+	}
+	
+	
+	
+	GpuNopTest( v3d );
+	RenderTriangle( v3d );
+	
+	
 }
 
-/*
- align 4
- CONTROL_LIST_BIN_STRUCT: ; Control List Of Concatenated Control Records & Data Structure (Binning Mode Thread 0)
- Tile_Binning_Mode_Configuration BIN_ADDRESS, $2000, BIN_BASE, 10, 8, Auto_Initialise_Tile_State_Data_Array ; Tile Binning Mode Configuration (B) (Address, Size, Base Address, Tile Width, Tile Height, Data)
- Start_Tile_Binning ; Start Tile Binning (Advances State Counter So That Initial State Items Actually Go Into Tile Lists) (B)
- 
- Clip_Window 0, 0, SCREEN_X, SCREEN_Y ; Clip Window
- Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
- Viewport_Offset 0, 0 ; Viewport Offset
- NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
- Indexed_Primitive_List Mode_Triangles + Index_Type_8, 3, VERTEX_LIST, 2 ; Indexed Primitive List (OpenGL)
- Flush ; Flush (Add Return-From-Sub-List To Tile Lists & Then Flush Tile Lists To Memory) (B)
- CONTROL_LIST_BIN_END:
+template<typename LAMBDA>
+void TDisplay::GpuExecute(volatile uint32_t* v3d,size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread)
+{
+	TGpuMemory MemoryAlloc( ProgramSizeAlloc );
+	auto* Memory = MemoryAlloc.Lock();
+	
+	auto ExecuteSize = SetupProgram( Memory );
+	
+	uint32_t RegStarts[2] =	{	V3D_CT0CA,	V3D_CT1CA	};
+	uint32_t RegEnds[2] = 	{	V3D_CT0EA,	V3D_CT1EA	};
+	uint32_t RegStatuss[2] =	{	V3D_CT0CS,	V3D_CT1CS	};
+	
+	auto RegStart = RegStarts[static_cast<uint32_t>(GpuThread)];
+	auto RegEnd = RegEnds[static_cast<uint32_t>(GpuThread)];
+	auto RegStatus = RegStatuss[static_cast<uint32_t>(GpuThread)];
+	
+	//	tell thread0 to start at our instructions
+	v3d[RegStart] = (uint32_t)(Memory);
+	//	set end address, also starts execution
+	v3d[RegEnd] = ((uint32_t)Memory) + ExecuteSize;
+	
 
- */
+	//	Wait a second to be sure the contorl list execution has finished
+	while(v3d[RegStatus] & 0x20)
+	{
+	}
+	
+	MemoryAlloc.Unlock();
+	MemoryAlloc.Free();
+}
 
+
+void TDisplay::GpuNopTest(volatile uint32_t* v3d)
+{
+	auto Size = 256;
+	auto ProgramSetup = [=] (uint8_t* Program)-> size_t
+	{
+		//	Now we construct our control list.
+		//	255 nops, with a halt somewhere in the middle
+		for ( unsigned i=0;	i<Size;	i++ )
+		{
+			Program[i] = VC_INSTRUCTION_NOP;
+		}
+		Program[0xbb] = VC_INSTRUCTION_HALT;
+		return Size;
+	};
+	GpuExecute( v3d, Size, ProgramSetup, TGpuThread::Thread0 );
+}
 
 void TDisplay::SetPixel(int Index,uint32_t Colour)
 {
@@ -747,6 +867,23 @@ void TDisplay::SetRow(int y,uint32_t Colour)
 	}
 }
 
+	
+void TDisplay::FillPixels(uint32_t Colour)
+{
+	auto PixelCount = mHeight * mWidth;
+	
+	uint32_t rgba = RGBA( 0,0,0,255 );
+	auto Address = mScreenBufferAddress;
+	//uint32_t* Buffer = (uint32_t*)Address;
+		
+	for ( unsigned i=0;	i<PixelCount;	i++,Address+=4)//,Buffer++ )
+	{
+		PUT32( Address, Colour );
+		//*Buffer = rgba;
+	}
+	
+}
+	
 
 void TDisplay::FillPixelsGradient()
 {
@@ -788,11 +925,268 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 	}
 }
 
-
-void TDisplay::SetupTileBins()
-{
 	
+	
+	void addbyte(uint8_t **list, uint8_t d) {
+  *((*list)++) = d;
+	}
+	
+	void addshort(uint8_t **list, uint16_t d) {
+  *((*list)++) = (d) & 0xff;
+  *((*list)++) = (d >> 8)  & 0xff;
+	}
+	
+	void addword(uint8_t **list, uint32_t d) {
+  *((*list)++) = (d) & 0xff;
+  *((*list)++) = (d >> 8)  & 0xff;
+  *((*list)++) = (d >> 16) & 0xff;
+  *((*list)++) = (d >> 24) & 0xff;
+	}
+	
+	void addfloat(uint8_t **list, float f) {
+  uint32_t d = *((uint32_t *)&f);
+  *((*list)++) = (d) & 0xff;
+  *((*list)++) = (d >> 8)  & 0xff;
+  *((*list)++) = (d >> 16) & 0xff;
+  *((*list)++) = (d >> 24) & 0xff;
+	}
+
+	
+uint8_t FakeGpuMem[0x800000];
+
+void TDisplay::RenderTriangle(volatile uint32_t* v3d)
+{
+	//	8mb
+	auto Size = 0x800000;
+	auto ProgramSizeAlloc = Size;
+	
+
+	TGpuMemory MemoryAlloc( ProgramSizeAlloc );
+	auto* Memory = MemoryAlloc.Lock();
+	
+	
+	//Memory = FakeGpuMem;
+	
+	
+	
+	
+	uint32_t bus_addr = (uint32_t)Memory;
+	uint8_t *list = Memory;
+	
+	uint8_t *p = list;
+	
+	// Configuration stuff
+	// Tile Binning Configuration.
+	//   Tile state data is 48 bytes per tile, I think it can be thrown away
+	//   as soon as binning is finished.
+	addbyte(&p, 112);
+	addword(&p, bus_addr + 0x6200); // tile allocation memory address
+	addword(&p, 0x8000); // tile allocation memory size
+	addword(&p, bus_addr + 0x100); // Tile state data address
+	//auto TileWidth = 30;	// 1920/64
+	//auto TileHeight = 17;	// 1080/64
+	auto TileWidth = mWidth / 64;
+	auto TileHeight = mHeight / 64;
+
+	addbyte(&p, TileWidth); // 1920/64
+	addbyte(&p, TileHeight); // 1080/64 (16.875)
+	addbyte(&p, 0x04); // config - gr: flush
+	
+	// Start tile binning.
+	addbyte(&p, 6);
+	
+	// Primitive type
+	addbyte(&p, 56);
+	addbyte(&p, 0x32); // 16 bit triangle
+	
+	// Clip Window
+	addbyte(&p, 102);
+	addshort(&p, 0);
+	addshort(&p, 0);
+	addshort(&p, mWidth); // width
+	addshort(&p, mHeight); // height
+	
+	// State
+	addbyte(&p, 96);
+	addbyte(&p, 0x03); // enable both foward and back facing polygons
+	addbyte(&p, 0x00); // depth testing disabled
+	addbyte(&p, 0x02); // enable early depth write
+	
+	// Viewport offset
+	addbyte(&p, 103);
+	addshort(&p, 7);
+	addshort(&p, 7);
+	
+	// The triangle
+	// No Vertex Shader state (takes pre-transformed vertexes,
+	// so we don't have to supply a working coordinate shader to test the binner.
+	addbyte(&p, 65);
+	addword(&p, bus_addr + 0x80); // Shader Record
+	
+	// primitive index list
+	addbyte(&p, 32);
+	addbyte(&p, 0x04); // 8bit index, trinagles
+	addword(&p, 3); // Length
+	addword(&p, bus_addr + 0x70); // address
+	addword(&p, 2); // Maximum index
+	
+	// End of bin list
+	// Flush
+	addbyte(&p, 5);
+	// Nop
+	addbyte(&p, 1);
+	// Halt
+	addbyte(&p, 0);
+	
+	int length = p - list;
+	//assert(length < 0x80);
+	
+	// Shader Record
+	p = list + 0x80;
+	addbyte(&p, 0x01); // flags
+	addbyte(&p, 6*4); // stride
+	addbyte(&p, 0xcc); // num uniforms (not used)
+	addbyte(&p, 3); // num varyings
+	addword(&p, bus_addr + 0xfe00); // Fragment shader code
+	addword(&p, bus_addr + 0xff00); // Fragment shader uniforms
+	addword(&p, bus_addr + 0xa0); // Vertex Data
+	
+	// Vertex Data
+	p = list + 0xa0;
+	// Vertex: Top, red
+	addshort(&p, (1920/2) << 4); // X in 12.4 fixed point
+	addshort(&p, 200 << 4); // Y in 12.4 fixed point
+	addfloat(&p, 1.0f); // Z
+	addfloat(&p, 1.0f); // 1/W
+	addfloat(&p, 1.0f); // Varying 0 (Red)
+	addfloat(&p, 0.0f); // Varying 1 (Green)
+	addfloat(&p, 0.0f); // Varying 2 (Blue)
+	
+	// Vertex: bottom left, Green
+	addshort(&p, 560 << 4); // X in 12.4 fixed point
+	addshort(&p, 800 << 4); // Y in 12.4 fixed point
+	addfloat(&p, 1.0f); // Z
+	addfloat(&p, 1.0f); // 1/W
+	addfloat(&p, 0.0f); // Varying 0 (Red)
+	addfloat(&p, 1.0f); // Varying 1 (Green)
+	addfloat(&p, 0.0f); // Varying 2 (Blue)
+	
+	// Vertex: bottom right, Blue
+	addshort(&p, 1360 << 4); // X in 12.4 fixed point
+	addshort(&p, 800 << 4); // Y in 12.4 fixed point
+	addfloat(&p, 1.0f); // Z
+	addfloat(&p, 1.0f); // 1/W
+	addfloat(&p, 0.0f); // Varying 0 (Red)
+	addfloat(&p, 0.0f); // Varying 1 (Green)
+	addfloat(&p, 1.0f); // Varying 2 (Blue)
+	
+	// Vertex list
+	p = list + 0x70;
+	addbyte(&p, 0); // top
+	addbyte(&p, 1); // bottom left
+	addbyte(&p, 2); // bottom right
+	
+	// fragment shader
+	p = list + 0xfe00;
+	addword(&p, 0x958e0dbf);
+	addword(&p, 0xd1724823); /* mov r0, vary; mov r3.8d, 1.0 */
+	addword(&p, 0x818e7176);
+	addword(&p, 0x40024821); /* fadd r0, r0, r5; mov r1, vary */
+	addword(&p, 0x818e7376);
+	addword(&p, 0x10024862); /* fadd r1, r1, r5; mov r2, vary */
+	addword(&p, 0x819e7540);
+	addword(&p, 0x114248a3); /* fadd r2, r2, r5; mov r3.8a, r0 */
+	addword(&p, 0x809e7009);
+	addword(&p, 0x115049e3); /* nop; mov r3.8b, r1 */
+	addword(&p, 0x809e7012);
+	addword(&p, 0x116049e3); /* nop; mov r3.8c, r2 */
+	addword(&p, 0x159e76c0);
+	addword(&p, 0x30020ba7); /* mov tlbc, r3; nop; thrend */
+	addword(&p, 0x009e7000);
+	addword(&p, 0x100009e7); /* nop; nop; nop */
+	addword(&p, 0x009e7000);
+	addword(&p, 0x500009e7); /* nop; nop; sbdone */
+	
+	// Render control list
+	p = list + 0xe200;
+	
+	// Clear color
+	addbyte(&p, 114);
+	addword(&p, 0xff000000); // Opaque Black
+	addword(&p, 0xff000000); // 32 bit clear colours need to be repeated twice
+	addword(&p, 0);
+	addbyte(&p, 0);
+	
+	// Tile Rendering Mode Configuration
+	addbyte(&p, 113);
+	//addword(&p, bus_addr + 0x10000); // framebuffer addresss
+	addword(&p, mScreenBufferAddress); // framebuffer addresss
+	
+	addshort(&p, mWidth); // width
+	addshort(&p, mHeight); // height
+	addbyte(&p, 0x04); // framebuffer mode (linear rgba8888)
+	addbyte(&p, 0x00);
+	
+	// Do a store of the first tile to force the tile buffer to be cleared
+	// Tile Coordinates
+	addbyte(&p, 115);
+	addbyte(&p, 0);
+	addbyte(&p, 0);
+	// Store Tile Buffer General
+	addbyte(&p, 28);
+	addshort(&p, 0); // Store nothing (just clear)
+	addword(&p, 0); // no address is needed
+	
+	// Link all binned lists together
+	for(int x = 0; x < TileWidth; x++) {
+		for(int y = 0; y < TileHeight; y++) {
+			
+			// Tile Coordinates
+			addbyte(&p, 115);
+			addbyte(&p, x);
+			addbyte(&p, y);
+			
+			// Call Tile sublist
+			addbyte(&p, TileHeight);
+			addword(&p, bus_addr + 0x6200 + (y * TileWidth + x) * 32);
+			
+			// Last tile needs a special store instruction
+			if(x == (TileWidth-1) && y == (TileHeight-1) ) {
+				// Store resolved tile color buffer and signal end of frame
+				addbyte(&p, 25);
+			} else {
+				// Store resolved tile color buffer
+				addbyte(&p, 24);
+			}
+		}
+	}
+	
+	int render_length = p - (list + 0xe200);
+	
+	
+//v3d[V3D_CT1CS] = 0x20;
+	v3d[V3D_CT0CA] = bus_addr;
+	v3d[V3D_CT0EA] = bus_addr + length;
+	
+	//V3D_BFC     = $00134 ; V3D Binning Mode Flush Count
+	//ldr r1,[r0,V3D_BFC] ; Load Flush Count
+	//tst r1,1 ; Test IF PTB Has Flushed All Tile Lists To Memory
+
+	// Wait for control list to execute
+	while(v3d[V3D_CT0CS] & 0x20);
+	
+
+	v3d[V3D_CT1CA] = bus_addr + 0xe200;
+	v3d[V3D_CT1EA] = bus_addr + 0xe200 + render_length;
+	
+	while(v3d[V3D_CT1CS] & 0x20);
+	
+	v3d[V3D_CT1CS] = 0x20;
+	
+	MemoryAlloc.Unlock();
+	MemoryAlloc.Free();
 }
+
 
 
 
@@ -1027,8 +1421,7 @@ void TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_
 
 
 TGpuMemory::TGpuMemory(uint32_t Size) :
-	mHandle		( 0 ),
-	mAddress	( nullptr )
+	mHandle		( 0 )
 {
 	auto Align4k = 0x1000;
 	auto Flags = TGpuMemFlags::Coherent | TGpuMemFlags::ZeroMemory;
@@ -1051,12 +1444,15 @@ void TGpuMemory::Free()
 	TMailbox::SetProperty( TMailbox::TTag::FreeGpuMemory, TMailbox::TChannel::Gpu, Data );
 }
 
-void TGpuMemory::Lock()
+uint8_t* TGpuMemory::Lock()
 {
 	uint32_t Data[1];
 	Data[0] = mHandle;
 		
 	TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
+	
+	auto Address = Data[0];
+	return (uint8_t*)Address;
 }
 	
 	
@@ -1070,30 +1466,21 @@ void TGpuMemory::Unlock()
 	
 	
 
-TGpuMemoryScopeLock::TGpuMemoryScopeLock(TGpuMemory& Memory) :
-	mMemory	( Memory )
-{
-	mMemory.Lock();
-}
-
-TGpuMemoryScopeLock::~TGpuMemoryScopeLock()
-{
-	mMemory.Unlock();
-}
-
-
 
 
 
 CAPI int notmain ( void )
 {
 	TKernel Kernel;
-	TDisplay Display( 1280, 720 );
+	TDisplay Display( 1280, 720, true );
+	//TDisplay Display( 640, 480, false );
+	
+	
 	
 	uint32_t Tick = 0;
 	while ( true )
 	{
-		DrawScreen( Display, Tick );
+	//	DrawScreen( Display, Tick );
 		Tick++;
 	}
 
