@@ -872,13 +872,13 @@ void TDisplay::SetupGpu()
 	
 	
 	//GpuNopTest();
-	
+	/*
 	if ( !SetupBinControl() )
 	{
 		FillPixels( RGBA(255,0,0,255) );
 		return;
 	}
-
+*/
 	if ( !SetupRenderControl() )
 	{
 		//FillPixels( RGBA(255,0,255,255) );
@@ -1204,12 +1204,12 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 #define TILE_STRUCT_SIZE	48
 #define AUTO_INIT_TILE_STATE_CMD	(1<<2)
 
-uint32_t TileBin[8192]  __attribute__ ((aligned(16)));
+uint32_t TileBin[4096]  __attribute__ ((aligned(16)));
 uint8_t TileState[TILE_WIDTH*TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
 //static volatile uint32_t* TileBin = (uint32_t*)0x00400000;
 //static volatile uint8_t* TileState = (uint8_t*)00500000;
-uint8_t Program0[0x1000]  __attribute__ ((aligned(4)));
-uint8_t Program1[0x1000]  __attribute__ ((aligned(4)));
+uint8_t Program0[4096]  __attribute__ ((aligned(16)));
+uint8_t Program1[4096]  __attribute__ ((aligned(16)));
 	
 //	128bit align
 uint8_t NV_SHADER_STATE_RECORD[200]  __attribute__ ((aligned(16)));
@@ -1444,7 +1444,7 @@ bool TDisplay::SetupBinControl()
 
 uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 {
-	uint32_t ClearColour = 0xFF00FFFF;
+	uint32_t ClearColour = RGBA( 255,255,0,255 );
 	uint32_t ClearFlags0 = 0;
 	uint8_t ClearStencil = 0;
 	//Clear_ZS      = $00FFFFFF ; Clear_Colors: Clear ZS (UINT24)
@@ -1454,13 +1454,15 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 	addbyte( &Program, 114 );
 	//	gr: gotta do colour twice, or RGBA16
 	addword( &Program, ClearColour );
+	addword( &Program, ClearColour );
 	addword( &Program, ClearFlags0 );
 	addbyte( &Program, ClearStencil );
 	
 	//	Tile_Rendering_Mode_Configuration
 #define Frame_Buffer_Color_Format_RGBA8888 0x4
 	addbyte( &Program, 113 );
-	addword( &Program, mScreenBufferAddress );
+	//	NEEDS to be this physics address!
+	addword( &Program, mScreenBufferAddress & 0x3FFFFFFF );
 	addshort( &Program, mWidth );
 	addshort( &Program, mHeight );
 	addshort( &Program, Frame_Buffer_Color_Format_RGBA8888 );
