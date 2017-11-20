@@ -28,9 +28,8 @@ constexpr const char RawSpriteAtlas[] =
 #include "SpriteCharAtlas.inc"
 ;
 static_assert( RawSpriteAtlas[0]=='\n', "0" );
-static_assert( RawSpriteAtlas[SPRITE_ATLAS_PREFIX_SIZE]=='0', "0" );
-static_assert( RawSpriteAtlas[SPRITE_ATLAS_PREFIX_SIZE+SPRITE_ATLAS_BLOCK_PREFIX_SIZE]=='_', "_");
-static_assert( RawSpriteAtlas[3]=='_', "_");
+static_assert( RawSpriteAtlas[SPRITE_ATLAS_PREFIX_SIZE]=='#', "first tab" );
+static_assert( RawSpriteAtlas[SPRITE_ATLAS_PREFIX_SIZE+SPRITE_ATLAS_BLOCK_PREFIX_SIZE]=='X', "X");
 
 
 template<size_t N>
@@ -51,7 +50,7 @@ char TranslateAtlas(char AtlasChar)
 	{
 		case '_':	return 2;
 		case 'X':	return 1;
-		case 'O':	return 0;
+		case '.':	return 0;
 		default:
 			return 0;
 	}
@@ -79,16 +78,6 @@ void ParseSpriteAtlas(char* Atlas)
 	}
 }
 
-uint8_t Dummy[SPRITE_WIDTH*SPRITE_HEIGHT] =
-{
-	2,2,2,2,2,
-	2,1,2,1,2,
-	2,2,1,2,2,
-	2,1,2,1,2,
-	2,2,1,2,2,
-	2,1,2,1,2,
-	2,2,2,2,2,
-};
 
 //	gr: this isn't initialising to 0
 int SpriteLookupInitialised = 0;
@@ -103,9 +92,10 @@ void ParseSpriteAtlas()
 	//	init
 	for ( int i=0;	i<256;	i++ )
 		SpriteLookup[i] = nullptr;
-	SpriteLookup['?'] = Dummy;
 	
-	for ( int a=0;	a<12;	a++ )
+	char FirstCharacter;
+	
+	for ( int a=0;	a<GetSpriteAtlasSize()/SPRITE_ATLAS_BLOCK_SIZE;	a++ )
 	{
 		auto* Atlas = (char*)RawSpriteAtlas;
 		Atlas += SPRITE_ATLAS_PREFIX_SIZE;
@@ -116,17 +106,20 @@ void ParseSpriteAtlas()
 		ParseSpriteAtlas( AtlasIndexStart );
 		SpriteLookup[(int)AtlasSpriteChar] = (const uint8_t*)AtlasIndexStart;
 		
+		if ( a==0 )
+			FirstCharacter = AtlasSpriteChar;
+		
 		if ( AtlasSpriteChar >= 'A' && AtlasSpriteChar <= 'Z' )
-			SpriteLookup[(int)AtlasSpriteChar - 'A'] = (const uint8_t*)AtlasIndexStart;
+			SpriteLookup[(int)AtlasSpriteChar - 'A' + 'a'] = (const uint8_t*)AtlasIndexStart;
 		if ( AtlasSpriteChar >= 'a' && AtlasSpriteChar <= 'z' )
-			SpriteLookup[(int)AtlasSpriteChar - 'a'] = (const uint8_t*)AtlasIndexStart;
+			SpriteLookup[(int)AtlasSpriteChar - 'a' + 'A'] = (const uint8_t*)AtlasIndexStart;
 		
 	}
 	
 	for ( int i=0;	i<256;	i++ )
 	{
 		if ( !SpriteLookup[i] )
-			SpriteLookup[i] = SpriteLookup['?'];
+			SpriteLookup[i] = SpriteLookup[FirstCharacter];
 	}
 	
 	SpriteLookupInitialised = MAGIC;

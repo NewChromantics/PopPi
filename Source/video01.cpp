@@ -990,7 +990,7 @@ void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 	int DigitCount = 0;
 	while ( Number > 0 && DigitCount < 20 )
 	{
-		DigitsReversed[DigitCount] = Number % 10;
+		DigitsReversed[DigitCount] = (Number % 10) + '0';
 		DigitCount++;
 		Number /= 10;
 	};
@@ -1007,7 +1007,7 @@ void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 	
 void TDisplay::DrawString(int x,int y,const char* String)
 {
-	int MaxSize = 50;
+	int MaxSize = 1000;
 	while ( MaxSize-- > 0 )
 	{
 		auto Char = String[0];
@@ -1016,7 +1016,7 @@ void TDisplay::DrawString(int x,int y,const char* String)
 			break;
 		int Width = 1;
 		DrawChar( x, y, Char, Width );
-		x += Width + 1;
+		x += Width;
 	}
 }
 	
@@ -1077,7 +1077,7 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 	}
 	
 	DrawNumber( 1,1,1234567890);
-	DrawString( 1,10,"Hello World! 1234567890");
+	DrawString( 1,300,"Hello World! 1234567890 abcdefghijklmnopqrstuvwyz!=(*).,'\#@bleh");
 }
 
 
