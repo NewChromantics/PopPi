@@ -252,7 +252,6 @@ public:
 	void		DrawNumber(int x,int y,int Number);
 	void		DrawChar(int x,int y,int Char);
 
-protected:
 	void		SetupGpu();
 	template<typename LAMBDA>
 	void		GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread);
@@ -265,6 +264,7 @@ protected:
 
 	
 public:
+	uint32_t	mClearColour;
 	uint32_t	mWidth;
 	uint32_t	mHeight;
 	uint32_t	mScreenBufferAddress;
@@ -667,7 +667,8 @@ void Sleep(int Ms)
 TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	mScreenBufferAddress	( 0 ),
 	mWidth					( Width ),
-	mHeight					( Height )
+	mHeight					( Height ),
+	mClearColour			( RGBA( 255,0,255,255 ) )
 {
 	
 	auto ScrollX = 0;
@@ -721,9 +722,11 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	
 		SetupGpu();
 	
-		Sleep(2000);
+		Sleep(9000);
+		
+		//	gr: without this... error... not sure why this affects things
 		//	see if we have control again or if setup is stuck
-		DrawScreen( *this, 100 );
+		//DrawScreen( *this, 100 );
 		
 		Sleep(2000);
 	}
@@ -872,13 +875,13 @@ void TDisplay::SetupGpu()
 	
 	
 	//GpuNopTest();
-	/*
+
 	if ( !SetupBinControl() )
 	{
 		FillPixels( RGBA(255,0,0,255) );
 		return;
 	}
-*/
+
 	if ( !SetupRenderControl() )
 	{
 		//FillPixels( RGBA(255,0,255,255) );
@@ -1198,18 +1201,18 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 }
 
 
-	
-#define TILE_WIDTH	(640/64)
-#define TILE_HEIGHT	(480/64)
+#define MAX_TILE_WIDTH		40
+#define MAX_TILE_HEIGHT		40
 #define TILE_STRUCT_SIZE	48
 #define AUTO_INIT_TILE_STATE_CMD	(1<<2)
 
-uint32_t TileBin[4096]  __attribute__ ((aligned(16)));
-uint8_t TileState[TILE_WIDTH*TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
+#define TILE_BIN_BLOCK_SIZE	32	//	gr; if not 32, there's flags for 64,128,256
+uint32_t TileBin[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE]  __attribute__ ((aligned(16)));
+uint8_t TileState[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
 //static volatile uint32_t* TileBin = (uint32_t*)0x00400000;
 //static volatile uint8_t* TileState = (uint8_t*)00500000;
-uint8_t Program0[4096]  __attribute__ ((aligned(16)));
-uint8_t Program1[4096]  __attribute__ ((aligned(16)));
+uint8_t Program0[4096*4]  __attribute__ ((aligned(16)));
+uint8_t Program1[4096*4]  __attribute__ ((aligned(16)));
 	
 //	128bit align
 uint8_t NV_SHADER_STATE_RECORD[200]  __attribute__ ((aligned(16)));
@@ -1242,7 +1245,7 @@ struct TVertex
 #define VERTEX_COUNT	3
 TVertex VERTEX_DATA[VERTEX_COUNT] __attribute__ ((aligned(16))) =
 {
-	{	EndianSwap16(320 * 16),	EndianSwap16(32 * 16),	EndianSwapFloat(1.0),	EndianSwapFloat(1.0)	},
+	{	EndianSwap16(10 * 16),	EndianSwap16(10 * 16),	EndianSwapFloat(1.0),	EndianSwapFloat(1.0)	},
 	{	EndianSwap16(32 * 16),	EndianSwap16(448 * 16),	EndianSwapFloat(1.0),	EndianSwapFloat(1.0)	},
 	{	EndianSwap16(608 * 16),	EndianSwap16(448 * 16),	EndianSwapFloat(1.0),	EndianSwapFloat(1.0)	},
 };
@@ -1331,13 +1334,16 @@ bool TDisplay::SetupBinControl()
 	//	CONTROL_LIST_BIN_STRUCT
 	auto* p = Program0;
 	
+	auto TileWidth = mWidth / 64;
+	auto TileHeight = mHeight / 64;
+	
 	//	Tile_Binning_Mode_Configuration
 	addbyte(&p, 112);
 	addword(&p, (uint32_t)TileBin );
 	addword(&p, sizeof(TileBin) );
 	addword(&p, (uint32_t)TileState );
-	addbyte(&p, TILE_WIDTH);
-	addbyte(&p, TILE_HEIGHT);
+	addbyte(&p, TileWidth);
+	addbyte(&p, TileHeight);
 	uint8_t Flags = AUTO_INIT_TILE_STATE_CMD;
 	addbyte(&p, Flags);
 	
@@ -1389,8 +1395,8 @@ bool TDisplay::SetupBinControl()
 	//	Flush
 	//addbyte(&p, 0x4);	//	flush
 	addbyte(&p, 0x5);	//	flush all state
-	//addbyte(&p, 1);	//	nop
-	//addbyte(&p, 0);	//	halt
+	addbyte(&p, 1);	//	nop
+	addbyte(&p, 0);	//	halt
 
 	
 
@@ -1420,7 +1426,7 @@ bool TDisplay::SetupBinControl()
 	
 	if ( !WaitForThread(0) )
 		return false;
-
+/*
 	if ( InitialFlushCount != 0 )
 	{
 		return false;
@@ -1435,7 +1441,7 @@ bool TDisplay::SetupBinControl()
 			break;
 		Sleep(1);
 	}
- 
+ */
 	return true;
 }
 
@@ -1444,7 +1450,6 @@ bool TDisplay::SetupBinControl()
 
 uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 {
-	uint32_t ClearColour = RGBA( 255,255,0,255 );
 	uint32_t ClearFlags0 = 0;
 	uint8_t ClearStencil = 0;
 	//Clear_ZS      = $00FFFFFF ; Clear_Colors: Clear ZS (UINT24)
@@ -1453,17 +1458,16 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 
 	addbyte( &Program, 114 );
 	//	gr: gotta do colour twice, or RGBA16
-	addword( &Program, ClearColour );
-	addword( &Program, ClearColour );
+	addword( &Program, mClearColour );
+	addword( &Program, mClearColour );
 	addword( &Program, ClearFlags0 );
 	addbyte( &Program, ClearStencil );
 	
 	//	Tile_Rendering_Mode_Configuration
 #define Frame_Buffer_Color_Format_RGBA8888 0x4
 	addbyte( &Program, 113 );
-	//	NEEDS to be this physics address!
 	addword( &Program, mScreenBufferAddress & 0x3FFFFFFF );
-	addshort( &Program, mWidth );
+	addshort( &Program, mWidth );	//	controls row stride
 	addshort( &Program, mHeight );
 	addshort( &Program, Frame_Buffer_Color_Format_RGBA8888 );
 
@@ -1473,46 +1477,54 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 	addbyte( &Program, 0 );
 	
 	//	Store_Tile_Buffer_General
+	//	gr:this seems to be for a dump sysem.. like capture
+	uint32_t Flags0_32 = 0;	//	disable double buffer in dump
+	uint16_t Flags33_48 = 0;
 	addbyte( &Program, 28 );
-	addshort( &Program, 0 );
-	addword( &Program, 0 );
+	addword( &Program, Flags0_32 );
+	addshort( &Program, Flags33_48 );
+	
 	//db $1C ; Control ID Code Byte: ID Code #28
 	//dh data16 ; Control ID Data Record Short: (Bit 0..15)
 	//dw address + data32 ; Control ID Data Record Word: Memory Base Address Of Frame/Tile Dump Buffer (In Multiples Of 16 Bytes) (Bit 20..47), Data Record (Bit 16..19)
 
-	
-	for ( int ty=0;	ty<TILE_HEIGHT;	ty++ )
+	auto TileWidth = mWidth / 64;
+	auto TileHeight = mHeight / 64;
+
+	for ( int ty=0;	ty<TileHeight;	ty++ )
 	{
-		for ( int tx=0;	tx<TILE_WIDTH;	tx++ )
+		for ( int tx=0;	tx<TileWidth;	tx++ )
 		{
 			//	set current tile
-			addbyte( &Program, 0x73 );
+			addbyte( &Program, 115 );
 			addbyte( &Program, tx );
 			addbyte( &Program, ty );
 			
 			//	branch (BRANCH?? these bins must be generated instructions or something)
 			//	Branch_To_Sub_List
-			int TileIndex = tx + ( TILE_WIDTH * ty );
-			auto* Address = &TileBin[ TileIndex ];
-			addbyte( &Program, 0x11 );
+			int TileIndex = tx + ( TileWidth * ty );
+			auto* Address = &TileBin[ TileIndex * TILE_BIN_BLOCK_SIZE ];
+			addbyte( &Program, 17 );
 			addword( &Program, (uint32_t)Address );
 			
-			bool LastTile = (tx==TILE_WIDTH-1) && (ty==TILE_HEIGHT-1);
+			bool LastTile = (tx==TileWidth-1) && (ty==TileHeight-1);
 			if ( LastTile )
 			{
-				addbyte( &Program, 0x19 );
+				addbyte( &Program, 25 );
 			}
 			else
 			{
 				//	Store_Multi_Sample Store Multi-Sample (Resolved Tile Color Buffer) (R)
-				addbyte( &Program, 0x18 );
+				addbyte( &Program, 24 );
 			}
 		}
 	}
 	
 	addbyte(&Program, 0x5);	//	flush all state
 	
-	
+	//addbyte(&Program, 1);	//	nop
+	//addbyte(&Program, 0);	//	halt
+
 	return Program;
 }
 
@@ -1848,7 +1860,21 @@ CAPI int notmain ( void )
 	uint32_t Tick = 0;
 	while ( true )
 	{
-	//	DrawScreen( Display, Tick );
+		Display.mClearColour = RGBA( Tick % 256, 0, 255, 255 );
+		/*
+		if ( !Display.SetupBinControl() )
+		{
+			Display.DrawNumber(10,180,666);
+			Sleep(1000);
+		}
+*/
+		if ( !Display.SetupRenderControl() )
+		{
+			Display.DrawNumber(10,200,999);
+			Sleep(1000);
+		}
+		Display.DrawNumber(10,230,Tick);
+		//DrawScreen( Display, Tick );
 		Tick++;
 	}
 
