@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		BF030B6F1FC35E43001BBB03 /* Sprites.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Sprites.cpp; path = Source/Sprites.cpp; sourceTree = "<group>"; };
+		BF030B701FC35E6E001BBB03 /* Sprites.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Sprites.h; path = Source/Sprites.h; sourceTree = "<group>"; };
+		BF030B711FC35EAB001BBB03 /* Kernel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Kernel.h; path = Source/Kernel.h; sourceTree = "<group>"; };
+		BF030B721FC36DA5001BBB03 /* SpriteCharAtlas.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = SpriteCharAtlas.inc; path = Source/SpriteCharAtlas.inc; sourceTree = "<group>"; };
 		BF7026D41FBDE7D600354F35 /* periph.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = periph.c; path = Source/periph.c; sourceTree = "<group>"; };
 		BF7026D51FBDE7D600354F35 /* vectors.s */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; name = vectors.s; path = Source/vectors.s; sourceTree = "<group>"; };
 		BF7026D61FBDE7D600354F35 /* video01.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = video01.cpp; path = Source/video01.cpp; sourceTree = "<group>"; };
@@ -30,6 +34,10 @@
 				BF7026D51FBDE7D600354F35 /* vectors.s */,
 				BF7026D61FBDE7D600354F35 /* video01.cpp */,
 				BF7026D71FBDE7DE00354F35 /* makefile */,
+				BF030B701FC35E6E001BBB03 /* Sprites.h */,
+				BF030B721FC36DA5001BBB03 /* SpriteCharAtlas.inc */,
+				BF030B711FC35EAB001BBB03 /* Kernel.h */,
+				BF030B6F1FC35E43001BBB03 /* Sprites.cpp */,
 			);
 			name = Source;
 			sourceTree = "<group>";

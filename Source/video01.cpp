@@ -1,3 +1,5 @@
+#include "Kernel.h"
+#include "Sprites.h"
 
 //-------------------------------------------------------------------------
 //-------------------------------------------------------------------------
@@ -59,22 +61,6 @@ extern "C"
 }
 #endif
 
-//	display is BGRA
-#define BGRA(r,g,b,a)		( (uint32_t(r)<<0) | (uint32_t(g)<<8) | (uint32_t(b)<<16) | (uint32_t(a)<<24) )
-#define RGBA(r,g,b,a)		( BGRA(b,g,r,a) )
-
-
-typedef unsigned char	uint8_t;
-typedef unsigned short	uint16_t;
-typedef unsigned int	uint32_t;
-typedef uint32_t		size_t;
-
-
-template<typename T>
-bool bool_cast(const T& v)
-{
-	return v != 0;
-}
 
 #define V3D_IDENT0_MAGICNUMBER	0x02443356	//	2V3D
 
@@ -249,8 +235,9 @@ public:
 	void		FillPixelsGradient();
 	void		FillPixelsCheckerBoard(int SquareSize);
 	
-	void		DrawNumber(int x,int y,int Number);
-	void		DrawChar(int x,int y,int Char);
+	void		DrawNumber(int x,int y,uint32_t Number);
+	void		DrawChar(int x,int y,int Char,int& CharWidth);
+	void		DrawString(int x,int y,const char* String);
 
 	void		SetupGpu();
 	template<typename LAMBDA>
@@ -875,7 +862,7 @@ void TDisplay::SetupGpu()
 	
 	
 	//GpuNopTest();
-
+/*
 	if ( !SetupBinControl() )
 	{
 		FillPixels( RGBA(255,0,0,255) );
@@ -887,7 +874,7 @@ void TDisplay::SetupGpu()
 		//FillPixels( RGBA(255,0,255,255) );
 		return;
 	}
-	
+	*/
 }
 
 template<typename LAMBDA>
@@ -973,172 +960,64 @@ void TDisplay::SetRow(int y,uint32_t Colour)
 }
 
 
-#define SPRITE_WIDTH	5
-#define SPRITE_HEIGHT	7
-int Sprite_0[] =
-{
-	2,2,2,2,2,
-	2,1,1,1,2,
-	2,1,2,1,2,
-	2,1,2,1,2,
-	2,1,2,1,2,
-	2,1,1,1,2,
-	2,2,2,2,2,
-};
-int Sprite_1[] =
-{
-	2,2,2,2,0,
-	2,1,1,2,0,
-	2,2,1,2,0,
-	0,2,1,2,0,
-	2,2,1,2,2,
-	2,1,1,1,2,
-	2,2,2,2,2,
-};
-int Sprite_2[] =
-{
-	2,2,2,2,2,
-	2,1,1,1,2,
-	2,2,2,1,2,
-	2,1,1,1,2,
-	2,1,2,2,2,
-	2,1,1,1,2,
-	2,2,2,2,2,
-};
-	int Sprite_3[] =
-	{
-		2,2,2,2,0,
-		2,1,1,2,2,
-		2,2,2,1,2,
-		2,1,1,2,2,
-		2,2,2,1,2,
-		2,1,1,2,2,
-		2,2,2,2,0,
-	};
-	int Sprite_4[] =
-	{
-		2,2,2,2,2,
-		2,1,2,1,2,
-		2,1,2,1,2,
-		2,1,1,1,2,
-		2,2,2,1,2,
-		0,0,2,1,2,
-		0,0,2,2,2,
-	};
-	int Sprite_5[] =
-	{
-		2,2,2,2,2,
-		2,1,1,1,2,
-		2,1,2,2,2,
-		2,1,1,1,2,
-		2,2,2,1,2,
-		2,1,1,1,2,
-		2,2,2,2,2,
-	};
-	int Sprite_6[] =
-	{
-		2,2,2,0,0,
-		2,1,2,0,0,
-		2,1,2,2,2,
-		2,1,1,1,2,
-		2,1,2,1,2,
-		2,1,1,1,2,
-		2,2,2,2,2,
-	};
-	int Sprite_7[] =
-	{
-		2,2,2,2,2,
-		2,1,1,1,2,
-		2,2,2,1,2,
-		0,2,1,1,2,
-		0,2,2,1,2,
-		0,0,2,1,2,
-		0,0,2,2,2,
-	};
-	int Sprite_8[] =
-	{
-		2,2,2,2,2,
-		2,1,1,1,2,
-		2,1,2,1,2,
-		2,1,1,1,2,
-		2,1,2,1,2,
-		2,1,1,1,2,
-		2,2,2,2,2,
-	};
-	int Sprite_9[] =
-	{
-		2,2,2,2,2,
-		2,1,1,1,2,
-		2,1,2,1,2,
-		2,1,1,1,2,
-		2,2,2,1,2,
-		0,0,2,1,2,
-		0,0,2,2,2,
-	};
-	
 	
 
-uint32_t Sprite_Palette[3] =
-	{
-		RGBA( 255,0,255,0 ),
-		RGBA( 255,255,255,255 ),
-		RGBA( 0,0,0,255 ),
-	};
-	
-
-void TDisplay::DrawChar(int x,int y,int Char)
+void TDisplay::DrawChar(int x,int y,int Char,int& Width)
 {
-	const int* SpriteTable[10] =
-	{
-		Sprite_0,
-		Sprite_1,
-		Sprite_2,
-		Sprite_3,
-		Sprite_4,
-		Sprite_5,
-		Sprite_6,
-		Sprite_7,
-		Sprite_8,
-		Sprite_9,
-	};
-	auto* Sprite = SpriteTable[Char];
+	int Height;
+	auto* Sprite = PopSprite::GetSprite( Char, Width, Height );
 	
-	for ( int row=0;	row<SPRITE_HEIGHT;	row++ )
+	for ( int row=0;	row<Height;	row++ )
 	{
-		for ( int col=0;	col<SPRITE_WIDTH;	col++ )
+		for ( int col=0;	col<Width;	col++ )
 		{
 			auto px = x + col;
 			auto py = y + row;
-			auto ColourIndex = Sprite[col + (row*SPRITE_WIDTH)];
-			auto Colour = Sprite_Palette[ColourIndex];
-			if ( !bool_cast(Colour & RGBA(0,0,0,255)) )
+			auto ColourIndex = Sprite[col + (row*Width)];
+			auto Colour = PopSprite::GetPaletteColour(ColourIndex);
+			if ( !Colour.IsOpaque() )
 				continue;
-			SetPixel( px,py,Colour );
+			SetPixel( px,py,Colour.bgra );
 		}
 	}
 
 }
 
-
-void TDisplay::DrawNumber(int x,int y,int Number)
+void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 {
-	int Digits[20];
-	Digits[0] = 0;
+	int DigitsReversed[20];
+	DigitsReversed[0] = 0;
 	int DigitCount = 0;
 	while ( Number > 0 && DigitCount < 20 )
 	{
-		Digits[DigitCount] = Number % 10;
+		DigitsReversed[DigitCount] = Number % 10;
 		DigitCount++;
 		Number /= 10;
 	};
 	
-	for ( int i=DigitCount-1;	i>=0;	i-- )
+	char Digits[20];
+	for ( int i=DigitCount-1;  i>=0;  i-- )
 	{
-		auto Digit = Digits[i];
-		DrawChar( x, y, Digit );
-		x += SPRITE_WIDTH + 1;
+		auto di = DigitCount - 1 - i;
+		Digits[di] = DigitsReversed[i];
 	}
+	Digits[DigitCount] = '\0';
+	DrawString( x, y, Digits );
+}
 	
+void TDisplay::DrawString(int x,int y,const char* String)
+{
+	int MaxSize = 50;
+	while ( MaxSize-- > 0 )
+	{
+		auto Char = String[0];
+		String++;
+		if ( Char == '\0' )
+			break;
+		int Width = 1;
+		DrawChar( x, y, Char, Width );
+		x += Width + 1;
+	}
 }
 	
 void TDisplay::FillPixels(uint32_t Colour)
@@ -1198,6 +1077,7 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 	}
 	
 	DrawNumber( 1,1,1234567890);
+	DrawString( 1,10,"Hello World! 1234567890");
 }
 
 
@@ -1550,7 +1430,7 @@ bool TDisplay::SetupRenderControl()
 		if ( State == Error )
 		{
 			auto ErrorStat = ReadV3dReg( V3D_ERRSTAT );
-			int y = mHeight - SPRITE_HEIGHT - 4;
+			int y = mHeight - 10 - 4;
 			int x = 1;
 
 			DrawNumber(x,y,ErrorStat);
@@ -1861,18 +1741,20 @@ CAPI int notmain ( void )
 	while ( true )
 	{
 		Display.mClearColour = RGBA( Tick % 256, 0, 255, 255 );
-		/*
+		
 		if ( !Display.SetupBinControl() )
 		{
 			Display.DrawNumber(10,180,666);
-			Sleep(1000);
+			Sleep(10);
 		}
-*/
+
+		//	gr this actually draws...
 		if ( !Display.SetupRenderControl() )
 		{
 			Display.DrawNumber(10,200,999);
-			Sleep(1000);
+			Sleep(10);
 		}
+		
 		Display.DrawNumber(10,230,Tick);
 		//DrawScreen( Display, Tick );
 		Tick++;
