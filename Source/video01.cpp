@@ -236,6 +236,7 @@ public:
 	void		FillPixelsCheckerBoard(int SquareSize);
 	
 	void		DrawNumber(int x,int y,uint32_t Number);
+	void		DrawHex(int x,int y,uint32_t Number);
 	void		DrawChar(int x,int y,int Char,int& CharWidth);
 	void		DrawString(int x,int y,const char* String);
 
@@ -248,9 +249,12 @@ public:
 	uint8_t*	SetupRenderControlProgram(uint8_t* Program);
 	bool		SetupRenderControl();
 	
-
+	int			GetConsoleY();
+	int			GetConsoleX(bool NewLine=true);
 	
 public:
+	int			mConsoleX;
+	int			mConsoleY;
 	uint32_t	mClearColour;
 	uint32_t	mWidth;
 	uint32_t	mHeight;
@@ -655,7 +659,9 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	mScreenBufferAddress	( 0 ),
 	mWidth					( Width ),
 	mHeight					( Height ),
-	mClearColour			( RGBA( 255,0,255,255 ) )
+	mClearColour			( RGBA( 255,0,255,255 ) ),
+	mConsoleX				( 1 ),
+	mConsoleY				( 201 )
 {
 	
 	auto ScrollX = 0;
@@ -812,25 +818,38 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	 Next we do some pointer arithmetic to set the structure fields to point to the proper VC addresses.  To execute a QPU program through the mailbox interface, we pass an array of message structures that contain a pointer to the uniforms to bind to the QPU program and then a pointer to the address of the QPU code to execute:
 	 */
 }
-	
-	/*
-	 align 4
-	 CONTROL_LIST_BIN_STRUCT: ; Control List Of Concatenated Control Records & Data Structure (Binning Mode Thread 0)
-	 Tile_Binning_Mode_Configuration BIN_ADDRESS, $2000, BIN_BASE, 10, 8, Auto_Initialise_Tile_State_Data_Array ; Tile Binning Mode Configuration (B) (Address, Size, Base Address, Tile Width, Tile Height, Data)
-	 Start_Tile_Binning ; Start Tile Binning (Advances State Counter So That Initial State Items Actually Go Into Tile Lists) (B)
-	 
-	 Clip_Window 0, 0, SCREEN_X, SCREEN_Y ; Clip Window
-	 Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
-	 Viewport_Offset 0, 0 ; Viewport Offset
-	 NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
-	 Indexed_Primitive_List Mode_Triangles + Index_Type_8, 3, VERTEX_LIST, 2 ; Indexed Primitive List (OpenGL)
-	 Flush ; Flush (Add Return-From-Sub-List To Tile Lists & Then Flush Tile Lists To Memory) (B)
-	 CONTROL_LIST_BIN_END:
-	 
-	 */
 
+/*
+align 4
+CONTROL_LIST_BIN_STRUCT: ; Control List Of Concatenated Control Records & Data Structure (Binning Mode Thread 0)
+Tile_Binning_Mode_Configuration BIN_ADDRESS, $2000, BIN_BASE, 10, 8, Auto_Initialise_Tile_State_Data_Array ; Tile Binning Mode Configuration (B) (Address, Size, Base Address, Tile Width, Tile Height, Data)
+Start_Tile_Binning ; Start Tile Binning (Advances State Counter So That Initial State Items Actually Go Into Tile Lists) (B)
 
-	
+Clip_Window 0, 0, SCREEN_X, SCREEN_Y ; Clip Window
+Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
+Viewport_Offset 0, 0 ; Viewport Offset
+NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
+Indexed_Primitive_List Mode_Triangles + Index_Type_8, 3, VERTEX_LIST, 2 ; Indexed Primitive List (OpenGL)
+Flush ; Flush (Add Return-From-Sub-List To Tile Lists & Then Flush Tile Lists To Memory) (B)
+CONTROL_LIST_BIN_END:
+
+*/
+
+int TDisplay::GetConsoleY()
+{
+	return mConsoleY;
+}
+
+int TDisplay::GetConsoleX(bool NewLine)
+{
+	if ( NewLine )
+	{
+		mConsoleY += 10;
+		mConsoleX = 1;
+	}
+	return mConsoleX;
+}
+
 #define VC_INSTRUCTION_NOP	1
 #define VC_INSTRUCTION_HALT	0
 	
@@ -981,6 +1000,8 @@ void TDisplay::DrawChar(int x,int y,int Char,int& Width)
 		}
 	}
 
+	mConsoleY = y;
+	mConsoleX = x + Width;
 }
 
 void TDisplay::DrawNumber(int x,int y,uint32_t Number)
@@ -1005,6 +1026,26 @@ void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 	DrawString( x, y, Digits );
 }
 	
+
+void TDisplay::DrawHex(int x,int y,uint32_t Number)
+{
+	char Digits[11];
+	Digits[0] = '0';
+	Digits[1] = '*';
+	for ( int i=0;	i<8;	i++ )
+	{
+		int d = 2 + i;
+		int Shift = (7-i) * 4;
+		int h = (Number >> Shift) & 0xf;
+		if ( h >= 10 )
+			Digits[d] = (h-10) + 'a';
+		else
+			Digits[d] = (h) + '0';
+	}
+	Digits[10] = '\0';
+	DrawString( x, y, Digits );
+}
+
 void TDisplay::DrawString(int x,int y,const char* String)
 {
 	int MaxSize = 1000;
@@ -1075,9 +1116,16 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 			Pixels[p] = Colours[ColourIndex];
 		}
 	}
+
+	DrawString( GetConsoleX(), GetConsoleY(), "one");
+	DrawString( GetConsoleX(), GetConsoleY(), "two");
+	DrawString( GetConsoleX(), GetConsoleY(), "three");
+	DrawString( GetConsoleX(), GetConsoleY(), "four");
+
+	DrawString( GetConsoleX(), GetConsoleY(), "Screen Buffer address");
+	DrawHex( GetConsoleX(), GetConsoleY(), mScreenBufferAddress );
 	
-	DrawNumber( 1,1,1234567890);
-	DrawString( 1,300,"Hello World! 1234567890 abcdefghijklmnopqrstuvwyz!=(*).,'\#@bleh");
+	DrawString( GetConsoleX(), GetConsoleY(),"Hello World! 1234567890 abcdefghijklmnopqrstuvxwyz!=(*).,'#@bleh");
 }
 
 
@@ -1433,7 +1481,8 @@ bool TDisplay::SetupRenderControl()
 			int y = mHeight - 10 - 4;
 			int x = 1;
 
-			DrawNumber(x,y,ErrorStat);
+			DrawString( GetConsoleX(), GetConsoleY(), "Error=" );
+			DrawNumber( GetConsoleX(false), GetConsoleY(), ErrorStat );
 			return false;
 		}
 		
@@ -1744,18 +1793,18 @@ CAPI int notmain ( void )
 		
 		if ( !Display.SetupBinControl() )
 		{
-			Display.DrawNumber(10,180,666);
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
 			Sleep(10);
 		}
 
 		//	gr this actually draws...
 		if ( !Display.SetupRenderControl() )
 		{
-			Display.DrawNumber(10,200,999);
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
 			Sleep(10);
 		}
 		
-		Display.DrawNumber(10,230,Tick);
+		Display.DrawNumber(0,0,Tick);
 		//DrawScreen( Display, Tick );
 		Tick++;
 	}
