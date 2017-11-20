@@ -699,7 +699,7 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	//	gr: no speed difference
 	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
 	//and r0,$3FFFFFFF ; Convert Mail Box Frame Buffer Pointer From BUS Address To Physical Address ($CXXXXXXX -> $3XXXXXXX)
-	//mScreenBufferAddress &= 0x3FFFFFFF;
+	mScreenBufferAddress &= 0x3FFFFFFF;
 
 	
 	FillPixelsCheckerBoard(10);
@@ -1009,12 +1009,14 @@ void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 	int DigitsReversed[20];
 	DigitsReversed[0] = 0;
 	int DigitCount = 0;
+	if ( Number == 0 )
+		DigitsReversed[DigitCount++] = '0';
 	while ( Number > 0 && DigitCount < 20 )
 	{
-		DigitsReversed[DigitCount] = (Number % 10) + '0';
-		DigitCount++;
+		DigitsReversed[DigitCount++] = (Number % 10) + '0';
 		Number /= 10;
 	};
+	
 	
 	char Digits[20];
 	for ( int i=DigitCount-1;  i>=0;  i-- )
@@ -1122,8 +1124,8 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 	DrawString( GetConsoleX(), GetConsoleY(), "three");
 	DrawString( GetConsoleX(), GetConsoleY(), "four");
 
-	DrawString( GetConsoleX(), GetConsoleY(), "Screen Buffer address");
-	DrawHex( GetConsoleX(), GetConsoleY(), mScreenBufferAddress );
+	DrawString( GetConsoleX(), GetConsoleY(), "Screen Buffer address = ");
+	DrawHex( GetConsoleX(false), GetConsoleY(), mScreenBufferAddress );
 	
 	DrawString( GetConsoleX(), GetConsoleY(),"Hello World! 1234567890 abcdefghijklmnopqrstuvxwyz!=(*).,'#@bleh");
 }
@@ -1264,6 +1266,18 @@ bool TDisplay::SetupBinControl()
 	
 	auto TileWidth = mWidth / 64;
 	auto TileHeight = mHeight / 64;
+	
+	DrawString( GetConsoleX(), GetConsoleY(), "(uint32_t)TileBin = ");
+	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileBin );
+
+	DrawString( GetConsoleX(), GetConsoleY(), "VERTEX_INDEXES = ");
+	DrawNumber( GetConsoleX(false), GetConsoleY(), VERTEX_INDEXES[0] );
+	DrawString( GetConsoleX(false), GetConsoleY(), ",");
+	DrawNumber( GetConsoleX(false), GetConsoleY(), VERTEX_INDEXES[1] );
+	DrawString( GetConsoleX(false), GetConsoleY(), ",");
+	DrawNumber( GetConsoleX(false), GetConsoleY(), VERTEX_INDEXES[2] );
+	
+	
 	
 	//	Tile_Binning_Mode_Configuration
 	addbyte(&p, 112);
