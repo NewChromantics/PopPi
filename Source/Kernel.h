@@ -61,3 +61,35 @@ inline constexpr bool bool_cast(const T& v)
 
 
 
+namespace Kernel
+{
+	template<typename T>
+	T*	GetGpuAddress(T* Addr)
+	{
+		//	map memory address to physical address... so... the cached/physical memory/virtual memory address over the bus
+		//	gr: note; not l1cache!
+		//	L2cache enabled
+		//BufferAddress |= 0x40000000;
+		//	L2cache disabled
+		//BufferAddress |= 0xC0000000;
+		
+		auto Addr32 = (uint32_t)Addr;
+		Addr32 |= 0x40000000;
+		return (T*)Addr32;
+	}
+	
+	template<typename T>
+	T*	GetCpuAddress(T* Addr)
+	{
+		auto Addr32 = (uint32_t)Addr;
+		Addr32 &= 0x3FFFFFFF;
+		return (T*)Addr32;
+	}
+	
+	template<typename T>
+	uint32_t	GetCpuAddress32(T* Addr)	{	return (uint32_t)GetCpuAddress(Addr);	}
+
+	template<typename T>
+	uint32_t	GetGpuAddress32(T* Addr)	{	return (uint32_t)GetGpuAddress(Addr);	}
+}
+

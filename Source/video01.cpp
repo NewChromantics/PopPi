@@ -230,9 +230,8 @@ public:
 
 	void		SetPixel(int x,int y,uint32_t Colour);
 	void		SetPixel(int Index,uint32_t Colour);
-	void		SetRow(int y,uint32_t Colour);
+	void		FillRow(int y,uint32_t Colour);
 	void		FillPixels(uint32_t Colour);
-	void		FillPixelsGradient();
 	void		FillPixelsCheckerBoard(int SquareSize);
 	
 	void		DrawNumber(int x,int y,uint32_t Number);
@@ -258,7 +257,7 @@ public:
 	uint32_t	mClearColour;
 	uint32_t	mWidth;
 	uint32_t	mHeight;
-	uint32_t	mScreenBufferAddress;
+	uint32_t*	mScreenBuffer;
 };
 
 void DrawScreen(TDisplay& Display,int Tick);
@@ -275,11 +274,17 @@ public:
 	
 	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
 	void 		Free();
+
+	uint8_t*	GetCpuAddress() const	{	return Kernel::GetCpuAddress(mLockedAddress);	}
+	uint8_t*	GetGpuAddress() const	{	return Kernel::GetGpuAddress(mLockedAddress);	}
+	
+private:
 	uint8_t*	Lock();
 	void		Unlock();
 	
 private:
 	uint32_t	mHandle;
+	uint8_t*	mLockedAddress;
 };
 
 
@@ -349,8 +354,7 @@ enum class TMailbox::TTag : uint32_t
 
 void MailboxWrite(void* Data,TMailbox::TChannel Channel)
 {
-    unsigned int mailbox = 0x2000B880;
-	
+	Data = Kernel::GetGpuAddress( Data );
 	uint32_t BufferAddress = (uint32_t)Data;
 	
 	auto ChannelBitMask = (1<<4)-1;
@@ -359,13 +363,7 @@ void MailboxWrite(void* Data,TMailbox::TChannel Channel)
 		//	throw
 		BufferAddress &= ~ChannelBitMask;
 	}
-	
-	//	map memory address to physical address... so... the cached/physical memory/virtual memory address over the bus
-	//	gr: note; not l1cache!
-	//	L2cache enabled
-	BufferAddress |= 0x40000000;
-	//	L2cache disabled
-	//BufferAddress |= 0xC0000000;
+
 	
 	//	and bit 1 to say... we're writing it? or because it's the channel?..
 	//	odd that it'll overwrite the display widht, but maybe that has to be aligned or something anyway
@@ -655,12 +653,12 @@ void Sleep(int Ms)
 
 
 TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
-	mScreenBufferAddress	( 0 ),
-	mWidth					( Width ),
-	mHeight					( Height ),
-	mClearColour			( RGBA( 255,0,255,255 ) ),
-	mConsoleX				( 1 ),
-	mConsoleY				( 201 )
+	mScreenBuffer	( nullptr ),
+	mWidth			( Width ),
+	mHeight			( Height ),
+	mClearColour	( RGBA( 255,0,255,255 ) ),
+	mConsoleX		( 1 ),
+	mConsoleY		( 201 )
 {
 	
 	auto ScrollX = 0;
@@ -668,10 +666,6 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	auto BitDepth = 32;
 	auto GpuPitch = 0;
 
-//	PERIPHERAL_BASE                = $3F000000 ; Peripheral Base Address
-	//	gr: is this a general ram address?
-	//	https://github.com/raspberrypi/firmware/wiki/Accessing-mailboxes
-	//	if L2 cache is enabled, this address needs to start at 0x40000000
 	
 	DisplayInfo.mFrameWidth = mWidth;
 	DisplayInfo.mFrameHeight = mHeight;
@@ -692,14 +686,8 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	MailboxRead( Channel );
 
 	//	read new contents of struct
-	mScreenBufferAddress = (uint32_t)DisplayInfo.mPixelBuffer;
+	mScreenBuffer = DisplayInfo.mPixelBuffer;
 	//	todo: if addr=0, loop
-
-	//	gr: no speed difference
-	//	https://github.com/PeterLemon/RaspberryPi/blob/master/Input/NES/Controller/GFXDemo/kernel.asm
-	//and r0,$3FFFFFFF ; Convert Mail Box Frame Buffer Pointer From BUS Address To Physical Address ($CXXXXXXX -> $3XXXXXXX)
-	mScreenBufferAddress &= 0x3FFFFFFF;
-
 	
 	FillPixelsCheckerBoard(10);
 	
@@ -899,7 +887,7 @@ template<typename LAMBDA>
 void TDisplay::GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread)
 {
 	TGpuMemory MemoryAlloc( ProgramSizeAlloc );
-	auto* Memory = MemoryAlloc.Lock();
+	auto* Memory = MemoryAlloc.GetCpuAddress();
 	
 	auto ExecuteSize = SetupProgram( Memory );
 	
@@ -912,9 +900,9 @@ void TDisplay::GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThrea
 	auto RegStatus = RegStatuss[static_cast<uint32_t>(GpuThread)];
 	
 	//	tell thread0 to start at our instructions
-	*GetV3dReg(RegStart) = (uint32_t)(Memory);
+	*GetV3dReg(RegStart) = Kernel::GetGpuAddress32(Memory);
 	//	set end address, also starts execution
-	*GetV3dReg(RegEnd) = ((uint32_t)Memory) + ExecuteSize;
+	*GetV3dReg(RegEnd) = Kernel::GetGpuAddress32(Memory) + ExecuteSize;
 	
 
 	//	Wait a second to be sure the contorl list execution has finished
@@ -922,7 +910,7 @@ void TDisplay::GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThrea
 	{
 	}
 	
-	MemoryAlloc.Unlock();
+	
 	MemoryAlloc.Free();
 }
 
@@ -946,14 +934,7 @@ void TDisplay::GpuNopTest()
 
 void TDisplay::SetPixel(int Index,uint32_t Colour)
 {
-	auto Address = Index;
-	Address *= 4;
-	Address += mScreenBufferAddress;
-	
-	//	gr: no perf improvement
-	//uint32_t* Buffer = (uint32_t*)Address;
-	//*Buffer = Colour;
-	PUT32( Address, Colour );
+	mScreenBuffer[Index] = Colour;
 }
 
 
@@ -964,16 +945,14 @@ void TDisplay::SetPixel(int x,int y,uint32_t Colour)
 }
 
 
-void TDisplay::SetRow(int y,uint32_t Colour)
+void TDisplay::FillRow(int y,uint32_t Colour)
 {
 	auto Start = 0 + ( y * mWidth );
 	auto End = mWidth + ( y * mWidth );
-	auto Address = mScreenBufferAddress + (Start * 4);
-	auto EndAddress = mScreenBufferAddress + (End * 4);
 	
-	for ( ;	Address<EndAddress;	Address+=4 )
+	for ( ;	Start<End;	Start++ )
 	{
-		PUT32( Address, Colour );
+		mScreenBuffer[Start] = Colour;
 	}
 }
 
@@ -1064,46 +1043,19 @@ void TDisplay::DrawString(int x,int y,const char* String)
 	
 void TDisplay::FillPixels(uint32_t Colour)
 {
-	auto PixelCount = mHeight * mWidth;
-	
-	uint32_t rgba = RGBA( 0,0,0,255 );
-	auto Address = mScreenBufferAddress;
-	//uint32_t* Buffer = (uint32_t*)Address;
-		
-	for ( unsigned i=0;	i<PixelCount;	i++,Address+=4)//,Buffer++ )
+	for ( int y=0;	y<mHeight;	y++ )
 	{
-		PUT32( Address, Colour );
-		//*Buffer = rgba;
+		FillRow(y,Colour);
 	}
-	
 }
 	
-
-void TDisplay::FillPixelsGradient()
-{
-	auto PixelCount = mHeight * mWidth;
-	
-	uint32_t rgba = RGBA( 0,0,0,255 );
-	auto Address = mScreenBufferAddress;
-	//uint32_t* Buffer = (uint32_t*)Address;
-	
-	for ( unsigned i=0;	i<PixelCount;	i++,Address+=4)//,Buffer++ )
-	{
-		rgba = RGBA(i % 256,255,0,255);
-		PUT32( Address, rgba );
-		//*Buffer = rgba;
-	}
-	
-}
-
-
 void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 {
 	uint32_t Colours[2];
 	Colours[0] = RGBA( 56,185,255,255 );
 	Colours[1] = RGBA( 199,214,221,255 );
 	
-	auto* Pixels = (uint32_t*)mScreenBufferAddress;
+	auto* Pixels = mScreenBuffer;
 	for ( unsigned y=0;	y<mHeight;	y++ )
 	{
 		auto yodd = (y/SquareSize) & 1;
@@ -1128,7 +1080,7 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 	Sleep(1);
 
 	DrawString( GetConsoleX(), GetConsoleY(), "Screen Buffer address = ");
-	DrawHex( GetConsoleX(false), GetConsoleY(), mScreenBufferAddress );
+	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)mScreenBuffer );
 	
 	DrawString( GetConsoleX(), GetConsoleY(),"Hello World! 1234567890 abcdefghijklmnopqrstuvxwyz!=(*).,'#@bleh");
 }
@@ -1310,17 +1262,20 @@ bool TDisplay::SetupBinControl()
 	
 #define Enable_Forward_Facing_Primitive	0x01	//	Configuration_Bits: Enable Forward Facing Primitive
 #define Enable_Reverse_Facing_Primitive	0x02	//	Configuration_Bits: Enable Reverse Facing Primitive
-#define Early_Z_Updates_Enable			0x0200
+#define Early_Z_Updates_Enable			0x02
 #define Mode_Triangles					0x04	//	Indexed_Primitive_List: Primitive Mode = Triangles
 #define Index_Type_8 					0x00	//	Indexed_Primitive_List: Index Type = 8-Bit
 #define Index_Type_16					0x10	//	Indexed_Primitive_List: Index Type = 16-Bit
 #if defined(ENABLE_TRIANGLES)
 	//	Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
-	uint8_t Config8 = Enable_Forward_Facing_Primitive | Enable_Reverse_Facing_Primitive;
-	uint16_t Config16 = Early_Z_Updates_Enable;
+	uint8_t Config[3];
+	Config[0] = Enable_Forward_Facing_Primitive | Enable_Reverse_Facing_Primitive;
+	Config[1] = 0x0;
+	Config[2] = Early_Z_Updates_Enable;
 	addbyte(&p, 0x60);
-	addbyte(&p, Config8);
-	addshort(&p, Config16);
+	addbyte(&p, Config[0]);
+	addbyte(&p, Config[1]);
+	addbyte(&p, Config[2]);
 #endif
 	
 	//	wont render without
@@ -1373,12 +1328,18 @@ bool TDisplay::SetupBinControl()
 
 	if ( !WaitForThread(0) )
 		return false;
-	
+
+	//	explicit stop
+	*GetV3dReg(V3D_CT0CS) = 0x20;
+
 	*GetV3dReg(V3D_CT0CA) = (uint32_t)Program0;
 	*GetV3dReg(V3D_CT0EA) = (uint32_t)Program0End;
 	
 	if ( !WaitForThread(0) )
 		return false;
+
+	//	explicit stop
+	*GetV3dReg(V3D_CT0CS) = 0x20;
 /*
 	if ( InitialFlushCount != 0 )
 	{
@@ -1403,6 +1364,9 @@ bool TDisplay::SetupBinControl()
 
 uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 {
+	//uint32_t ClearZMask = 0xffff;
+	//uint32_t ClearVGMask = 0xff;
+	//uint32_t ClearFlags0 = ClearZMask | (ClearVGMask<<24);
 	uint32_t ClearFlags0 = 0;
 	uint8_t ClearStencil = 0;
 	//Clear_ZS      = $00FFFFFF ; Clear_Colors: Clear ZS (UINT24)
@@ -1419,7 +1383,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 	//	Tile_Rendering_Mode_Configuration
 #define Frame_Buffer_Color_Format_RGBA8888 0x4
 	addbyte( &Program, 113 );
-	addword( &Program, mScreenBufferAddress & 0x3FFFFFFF );
+	addword( &Program, Kernel::GetCpuAddress32(mScreenBuffer) );
 	addshort( &Program, mWidth );	//	controls row stride
 	addshort( &Program, mHeight );
 	addshort( &Program, Frame_Buffer_Color_Format_RGBA8888 );
@@ -1489,10 +1453,14 @@ bool TDisplay::SetupRenderControl()
 	auto Length = (int)Program1End - (int)Program1;
 	if ( Length == 0 )
 		return false;
+
+	//	explicit stop
+	*GetV3dReg(V3D_CT1CS) = 0x20;
 	
 	auto Thread = 1;
 	if ( !WaitForThread(Thread) )
 		return false;
+	
 	
 	*GetV3dReg(V3D_CT1CA) = (uint32_t)Program1;
 	*GetV3dReg(V3D_CT1EA) = (uint32_t)Program1End;
@@ -1515,6 +1483,9 @@ bool TDisplay::SetupRenderControl()
 		if ( State == Finished )
 			break;
 	}
+
+	//	explicit stop
+	*GetV3dReg(V3D_CT1CS) = 0x20;
 
 	return true;
 }
@@ -1604,7 +1575,7 @@ void DrawScreen(TDisplay& Display,int Tick)
 	
 		if ( y == NextRow )
 			rgba = RGBA(0,0,0,255);
-		Display.SetRow( y, rgba );
+		Display.FillRow( y, rgba );
 	}
 	
 	
@@ -1751,11 +1722,10 @@ void TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_
 
 }
 
-	
-
 
 TGpuMemory::TGpuMemory(uint32_t Size) :
-	mHandle		( 0 )
+	mHandle			( 0 ),
+	mLockedAddress	( nullptr )
 {
 	auto Align4k = 0x1000;
 	auto Flags = TGpuMemFlags::Coherent | TGpuMemFlags::ZeroMemory;
@@ -1768,10 +1738,14 @@ TGpuMemory::TGpuMemory(uint32_t Size) :
 	TMailbox::SetProperty( TMailbox::TTag::AllocGpuMemory, TMailbox::TChannel::Gpu, Data );
 
 	mHandle = Data[0];
+	
+	mLockedAddress = Lock();
 }
 	
 void TGpuMemory::Free()
 {
+ 	Unlock();
+		
 	uint32_t Data[1];
 	Data[0] = mHandle;
 	
@@ -1796,6 +1770,8 @@ void TGpuMemory::Unlock()
 	Data[0] = mHandle;
 		
 	TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
+	
+	mLockedAddress = nullptr;
 }
 	
 	
