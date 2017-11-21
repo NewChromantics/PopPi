@@ -1050,7 +1050,7 @@ void TDisplay::DrawHex(int x,int y,uint32_t Number)
 
 void TDisplay::DrawString(int x,int y,const char* String)
 {
-	int MaxSize = 1000;
+	int MaxSize = 400;
 	while ( MaxSize-- > 0 )
 	{
 		auto Char = String[0];
@@ -1261,15 +1261,20 @@ bool WaitForThread(int ThreadIndex)
 	
 bool TDisplay::SetupBinControl()
 {
+//#define ENABLE_TRIANGLES
+	
 	//	CONTROL_LIST_BIN_STRUCT
 	auto* p = Program0;
 	
 	auto TileWidth = mWidth / 64;
 	auto TileHeight = mHeight / 64;
 	
-	DrawString( GetConsoleX(), GetConsoleY(), "(uint32_t)TileBin = ");
+	DrawString( GetConsoleX(), GetConsoleY(), "TileBin*  = ");
 	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileBin );
-
+	
+	DrawString( GetConsoleX(), GetConsoleY(), "TileState*= ");
+	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileState );
+	
 	DrawString( GetConsoleX(), GetConsoleY(), "VERTEX_INDEXES = ");
 	DrawNumber( GetConsoleX(false), GetConsoleY(), VERTEX_INDEXES[0] );
 	DrawString( GetConsoleX(false), GetConsoleY(), ",");
@@ -1306,19 +1311,22 @@ bool TDisplay::SetupBinControl()
 #define Mode_Triangles					0x04	//	Indexed_Primitive_List: Primitive Mode = Triangles
 #define Index_Type_8 					0x00	//	Indexed_Primitive_List: Index Type = 8-Bit
 #define Index_Type_16					0x10	//	Indexed_Primitive_List: Index Type = 16-Bit
-
+#if defined(ENABLE_TRIANGLES)
 	//	Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
 	uint8_t Config8 = Enable_Forward_Facing_Primitive | Enable_Reverse_Facing_Primitive;
 	uint16_t Config16 = Early_Z_Updates_Enable;
 	addbyte(&p, 0x60);
 	addbyte(&p, Config8);
 	addshort(&p, Config16);
+#endif
 	
+	//	wont render without
 	//	Viewport_Offset
 	addbyte(&p, 0x67);
-	addshort(&p, 0);
-	addshort(&p, 0);
-
+	addshort(&p, 10);
+	addshort(&p, 10);
+	
+#if defined(ENABLE_TRIANGLES)
 	//	NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
 	addbyte(&p, 0x41);
 	auto* VertexShaderState = SetupVertexShaderState();
@@ -1333,12 +1341,12 @@ bool TDisplay::SetupBinControl()
 	addword(&p, IndexCount);
 	addword(&p, (uint32_t)VERTEX_INDEXES );
 	addword(&p, MaxIndex);
-
+#endif
 	//	Flush
-	//addbyte(&p, 0x4);	//	flush
-	addbyte(&p, 0x5);	//	flush all state
-	addbyte(&p, 1);	//	nop
-	addbyte(&p, 0);	//	halt
+	addbyte(&p, 0x4);	//	flush
+	//addbyte(&p, 0x5);	//	flush all state
+	//addbyte(&p, 1);	//	nop
+	//addbyte(&p, 0);	//	halt
 
 	
 
@@ -1495,8 +1503,9 @@ bool TDisplay::SetupRenderControl()
 			int y = mHeight - 10 - 4;
 			int x = 1;
 
-			DrawString( GetConsoleX(), GetConsoleY(), "Error=" );
-			DrawNumber( GetConsoleX(false), GetConsoleY(), ErrorStat );
+			
+			DrawString( GetConsoleX(), GetConsoleY(), "Thread1 Error=" );
+			DrawHex( GetConsoleX(false), GetConsoleY(), ErrorStat );
 			return false;
 		}
 		
@@ -1803,12 +1812,19 @@ CAPI int notmain ( void )
 	uint32_t Tick = 0;
 	while ( true )
 	{
+		Display.DrawString( 0, 0, "Tick ");
+		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
+		
 		Display.mClearColour = RGBA( Tick % 256, 0, 255, 255 );
 		
 		if ( !Display.SetupBinControl() )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
 			Sleep(10);
+		}
+		else
+		{
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl success");
 		}
 
 		//	gr this actually draws...
@@ -1817,9 +1833,11 @@ CAPI int notmain ( void )
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
 			Sleep(10);
 		}
+		else
+		{
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl success");
+		}
 		
-		Display.DrawNumber(0,0,Tick);
-		//DrawScreen( Display, Tick );
 		Tick++;
 	}
 
