@@ -644,7 +644,6 @@ TDisplayInfo DisplayInfo;
 
 void Sleep(int Ms)
 {
-	return;
 	//	random number, tis loop is basicaly "sleep for x ticks" so 250/1000mhz of nops is what we need?
 	Ms *= 1 * 250 * 100;
 	while ( Ms > 0 )
@@ -710,18 +709,18 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 
 	if ( EnableGpu )
 	{
-		Sleep(2000);
+		Sleep(1000);
 	
 	
 		SetupGpu();
 	
-		Sleep(9000);
+		Sleep(1000);
 		
 		//	gr: without this... error... not sure why this affects things
 		//	see if we have control again or if setup is stuck
 		//DrawScreen( *this, 100 );
 		
-		Sleep(2000);
+		Sleep(1000);
 	}
 	
 	//	all from kernel.asm
@@ -1120,9 +1119,13 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 	}
 
 	DrawString( GetConsoleX(), GetConsoleY(), "one");
+	Sleep(1);
 	DrawString( GetConsoleX(), GetConsoleY(), "two");
+	Sleep(1);
 	DrawString( GetConsoleX(), GetConsoleY(), "three");
+	Sleep(1);
 	DrawString( GetConsoleX(), GetConsoleY(), "four");
+	Sleep(1);
 
 	DrawString( GetConsoleX(), GetConsoleY(), "Screen Buffer address = ");
 	DrawHex( GetConsoleX(false), GetConsoleY(), mScreenBufferAddress );
@@ -1839,6 +1842,7 @@ CAPI int notmain ( void )
 		}
 		
 		Tick++;
+		Sleep(1000);
 	}
 
 
