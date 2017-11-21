@@ -277,14 +277,15 @@ class TGpuMemory;
 class TGpuMemory
 {
 public:
-	TGpuMemory(uint32_t Size);
+	TGpuMemory(uint32_t Size,bool Lock);
 	
 	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
 	void 		Free();
 
-	size_t		GetSize() const			{	return mSize;	}
-	uint8_t*	GetCpuAddress() const	{	return TKernel::GetCpuAddress(mLockedAddress);	}
-	uint8_t*	GetGpuAddress() const	{	return TKernel::GetGpuAddress(mLockedAddress);	}
+	size_t		GetSize() const				{	return mSize;	}
+	uint8_t*	GetCpuAddress() const		{	return TKernel::GetCpuAddress(mLockedAddress);	}
+	uint8_t*	GetGpuAddress() const		{	return TKernel::GetGpuAddress(mLockedAddress);	}
+	uint8_t*	GetAllocatedAddress() const	{	return mLockedAddress;	}
 	
 	uint8_t*	Lock();
 	bool		Unlock();
@@ -360,8 +361,8 @@ enum class TMailbox::TTag : uint32_t
 //	some more references for magic nmbers
 //	https://www.raspberrypi.org/forums/viewtopic.php?f=29&t=65596
 //	http://magicsmoke.co.za/?p=284
-#define MAILBOX_STATUS_BUSY 0x80000000
-#define MAILBOX_STATUS_EMPTY 0x40000000
+#define MAILBOX_STATUS_BUSY		0x80000000
+#define MAILBOX_STATUS_EMPTY	0x40000000
 
 
 void MailboxWrite(volatile void* Data,TMailbox::TChannel Channel)
@@ -386,11 +387,14 @@ void MailboxWrite(volatile void* Data,TMailbox::TChannel Channel)
 
     while(1)
     {
+		unsigned int mailbox = 0x2000B880;
 		//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 		//	0x80000000: request successful
 		//	0x80000001: error parsing request buffer (partial response)
-		//uint32_t MailboxResponse = GET32(mailbox+20);
-		uint32_t MailboxResponse = MAILBOX0->sender;
+		uint32_t MailboxResponse = GET32(mailbox+24);
+		//uint32_t MailboxResponse = MAILBOX0->sender;
+		//uint32_t MailboxResponse = GET32( (uint32_t)&MAILBOX0->sender );
+		
 		//	break when we... have NO response waiting??
 		bool StatusBusy = bool_cast(MailboxResponse & MAILBOX_STATUS_BUSY);
 		if( !StatusBusy )
@@ -412,14 +416,16 @@ uint32_t MailboxRead(TMailbox::TChannel Channel)
         while(1)
         {
 			//	gr: sender, not status, suggests this struct may be off...
-			uint32_t MailboxResponse = MAILBOX0->sender;
+			//uint32_t MailboxResponse = GET32( (uint32_t)&MAILBOX0->sender );
+			uint32_t MailboxResponse = GET32( mailbox+24 );
 			bool StatusEmpty = bool_cast(MailboxResponse & MAILBOX_STATUS_EMPTY);
             if ( !StatusEmpty )
 				break;
         }
 
 		//	gr: switching this to MAILBOX0->read doesn't work :/
-		auto Response = GET32( mailbox+0x00 );
+		auto Response = GET32( mailbox+0 );
+		//auto Response = GET32( (uint32_t)&MAILBOX0->read );
 		auto ResponseChannel = static_cast<TMailbox::TChannel>( Response & ChannelBitMask );
         if ( ResponseChannel == Channel )
 		{
@@ -565,15 +571,25 @@ TKernel::TKernel()
 	//	read base addresses
 	{
 		uint32_t Data[2];
-		TMailbox::SetProperty( TMailbox::TTag::GetCpuBaseAddress, TMailbox::TChannel::Gpu, Data );
+		auto ResponseSize = TMailbox::SetProperty( TMailbox::TTag::GetCpuBaseAddress, TMailbox::TChannel::Gpu, Data );
 		mCpuMemoryBase = Data[0];
 		mCpuMemorySize = Data[1];
+		if ( ResponseSize != 2 )
+		{
+			mCpuMemoryBase = 0x0bad3000;
+			mCpuMemorySize = ResponseSize;
+		}
 	}
 	{
 		uint32_t Data[2];
-		TMailbox::SetProperty( TMailbox::TTag::GetGpuBaseAddress, TMailbox::TChannel::Gpu, Data );
+		auto ResponseSize = TMailbox::SetProperty( TMailbox::TTag::GetGpuBaseAddress, TMailbox::TChannel::Gpu, Data );
 		mGpuMemoryBase = Data[0];
 		mGpuMemorySize = Data[1];
+		if ( ResponseSize != 2 )
+		{
+			mCpuMemoryBase = 0x0bad4000;
+			mCpuMemorySize = ResponseSize;
+		}
 	}
 
 	
@@ -924,7 +940,7 @@ void TDisplay::SetupGpu()
 template<typename LAMBDA>
 void TDisplay::GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread)
 {
-	TGpuMemory MemoryAlloc( ProgramSizeAlloc );
+	TGpuMemory MemoryAlloc( ProgramSizeAlloc, true );
 	auto* Memory = MemoryAlloc.GetCpuAddress();
 	
 	auto ExecuteSize = SetupProgram( Memory );
@@ -960,7 +976,7 @@ void TDisplay::GpuNopTest()
 	{
 		//	Now we construct our control list.
 		//	255 nops, with a halt somewhere in the middle
-		for ( unsigned i=0;	i<Size;	i++ )
+		for ( auto i=0;	i<Size;	i++ )
 		{
 			Program[i] = VC_INSTRUCTION_NOP;
 		}
@@ -1727,20 +1743,37 @@ void DrawScreen(TDisplay& Display,int Tick)
  */
 
 	
+volatile uint32_t MailboxBuffer[1000*1000] __attribute__ ((aligned(16)));
+int MailboxBufferPos = 1;
+volatile uint32_t* AllocMailboxBuffer(int Size)
+{
+	//	align to 16 bytes
+	int Align = 16/sizeof(uint32_t);
+	if ( MailboxBufferPos % Align != 0 )
+	{
+		MailboxBufferPos += Align - (MailboxBufferPos % Align);
+	}
+	auto* Address = &MailboxBuffer[MailboxBufferPos];
+	MailboxBufferPos += Size;
+	return Address;
+}
 
 //	returns number of elements returned
 template<size_t PAYLOADSIZE>
 int TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool ReadData)
 {
 	auto Tag32 = static_cast<uint32_t>( Tag );
-	volatile uint32_t Data[PAYLOADSIZE + 6] __attribute__ ((aligned(16)));
+	auto Size = PAYLOADSIZE + 6;
+	//volatile static uint32_t Data[PAYLOADSIZE + 6] __attribute__ ((aligned(16)));
+	auto* Data = AllocMailboxBuffer(Size+10);
 	
-	Data[0] = sizeof(Data);
+	Data[0] = Size * sizeof(uint32_t);
 	Data[1] = 0x00000000;	// process request
 	
 	Data[2] = Tag32;
 	Data[3] = PAYLOADSIZE * sizeof(uint32_t);	//	size of buffer
-	Data[4] = 0x0;	//	size of data returned. needs to be 0 to send
+	//Data[4] = PAYLOADSIZE * sizeof(uint32_t);	//	size of data returned. needs to be 0 to send
+	Data[4] = 0;	//	size of data returned. needs to be 0 to send
 	for ( unsigned i=0;	i<PAYLOADSIZE;	i++ )
 	{
 		Data[5+i] = Payload[i];
@@ -1772,7 +1805,7 @@ int TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_t
 }
 
 
-TGpuMemory::TGpuMemory(uint32_t Size) :
+TGpuMemory::TGpuMemory(uint32_t Size,bool Lock) :
 	mHandle			( 0 ),
 	mSize			( Size ),
 	mLockedAddress	( nullptr )
@@ -1788,6 +1821,11 @@ TGpuMemory::TGpuMemory(uint32_t Size) :
 	Data[2] = Flags;
 	
 	auto ReturnSize = TMailbox::SetProperty( TMailbox::TTag::AllocGpuMemory, TMailbox::TChannel::Gpu, Data );
+	if ( ReturnSize == -1 )
+	{
+		mHandle = 0x0bad2000 | 0xffff;
+		return;
+	}
 	if ( ReturnSize != 1 )
 	{
 		mHandle = 0x0bad2000 | ReturnSize;
@@ -1796,7 +1834,8 @@ TGpuMemory::TGpuMemory(uint32_t Size) :
 
 	mHandle = Data[0];
 	
-	mLockedAddress = Lock();
+	if ( Lock )
+		mLockedAddress = this->Lock();
 }
 	
 void TGpuMemory::Free()
@@ -1815,8 +1854,8 @@ uint8_t* TGpuMemory::Lock()
 	Data[0] = mHandle;
 		
 	auto ResponseSize = TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
-	if ( ResponseSize != 1 )
-		return (uint8_t*)(uint32_t)(0xbad10000|ResponseSize);
+	//if ( ResponseSize != 1 )
+	//	return (uint8_t*)(uint32_t)(0xbad10000|ResponseSize);
 	
 	auto Address = Data[0];
 	return (uint8_t*)Address;
@@ -1862,6 +1901,9 @@ CAPI int notmain ( void )
 	}
 	*/
 	
+	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "MailboxBufferPos" );
+	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), MailboxBufferPos );
+	
 
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Cpu base address: ");
 	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), TKernel::mCpuMemoryBase );
@@ -1881,32 +1923,48 @@ CAPI int notmain ( void )
 	auto DebugAlloc = [&Display](TGpuMemory& Mem,const char* Name)
 	{
 		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), Name );
-		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), "  mem handle: ");
+		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), " mem handle: ");
 		Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), Mem.mHandle );
 		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), ", address: ");
-		auto Addr =(uint32_t)Mem.GetGpuAddress();
+		auto Addr =(uint32_t)Mem.GetAllocatedAddress();
 		Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), Addr );
+		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), ", size: ");
+		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Mem.GetSize() );
 	};
 	
 	
-	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin) );
+	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin), true );
 	DebugAlloc( TileBins, "Tile Bins" );
-
+/*
 	if ( !TileBins.Unlock() )
 		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Tile bin unlock failed" );
-
+*/
 	//	gr: something around here messes with the const strings
 	//		moving code around does it
 	
-	TGpuMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE );
+	int StateSize = MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE;
+	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Allocating tile state bytes: " );
+	Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), StateSize );
+	
+	TGpuMemory TileState( StateSize, true );
 	DebugAlloc( TileState, "Tile State" );
 	
-	TGpuMemory Program0( 4096 );
+	TGpuMemory Program0( 4096, true );
 	DebugAlloc( Program0, "Program0" );
-
-	TGpuMemory Program1( 4096 );
+	
+	TGpuMemory Program1( 4096, true );
 	DebugAlloc( Program1, "Program1" );
+	
+	TGpuMemory Program2( 4096, true );
+	DebugAlloc( Program2, "Program2" );
+	
+	TGpuMemory Program3( 4096, true );
+	DebugAlloc( Program3, "Program3" );
+	
+	TGpuMemory Program4( 4096, true );
+	DebugAlloc( Program4, "Program4" );
 
+	return 1;
 	
 	uint32_t Tick = 0;
 	while ( true )
