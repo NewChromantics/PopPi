@@ -1277,7 +1277,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	//	CONTROL_LIST_BIN_STRUCT
 	auto* p = TKernel::GetCpuAddress((uint8_t*)ProgramMemory);
 	
-	
+	/*
 	DrawString( GetConsoleX(), GetConsoleY(), "TileBin*  = ");
 	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileBinMemory );
 	
@@ -1291,7 +1291,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	DrawString( GetConsoleX(false), GetConsoleY(), ",");
 	DrawNumber( GetConsoleX(false), GetConsoleY(), VERTEX_INDEXES[2] );
 	
-	
+	*/
 	
 	//	Tile_Binning_Mode_Configuration
 	addbyte(&p, 112);
@@ -1384,7 +1384,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 		return false;
 
 	//	explicit stop
-	*GetV3dReg(V3D_CT0CS) = 0x20;
+	//*GetV3dReg(V3D_CT0CS) = 0x20;
 
 	*GetV3dReg(V3D_CT0CA) = TKernel::GetGpuAddress32(ProgramMemory);
 	*GetV3dReg(V3D_CT0EA) = TKernel::GetGpuAddress32(ProgramMemoryEnd);
@@ -1393,7 +1393,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 		return false;
 
 	//	explicit stop
-	*GetV3dReg(V3D_CT0CS) = 0x20;
+	//*GetV3dReg(V3D_CT0CS) = 0x20;
 /*
 	if ( InitialFlushCount != 0 )
 	{
@@ -1493,8 +1493,8 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 	
 	addbyte(&Program, 0x5);	//	flush all state
 	
-	//addbyte(&Program, 1);	//	nop
-	//addbyte(&Program, 0);	//	halt
+	addbyte(&Program, 1);	//	nop
+	addbyte(&Program, 0);	//	halt
 
 	return Program;
 }
@@ -1509,7 +1509,7 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 		return false;
 
 	//	explicit stop
-	*GetV3dReg(V3D_CT1CS) = 0x20;
+	//*GetV3dReg(V3D_CT1CS) = 0x20;
 	
 	auto Thread = 1;
 	if ( !WaitForThread(Thread) )
@@ -1525,9 +1525,6 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 		if ( State == Error )
 		{
 			auto ErrorStat = ReadV3dReg( V3D_ERRSTAT );
-			int y = mHeight - 10 - 4;
-			int x = 1;
-
 			
 			DrawString( GetConsoleX(), GetConsoleY(), "Thread1 Error=" );
 			DrawHex( GetConsoleX(false), GetConsoleY(), ErrorStat );
@@ -1539,7 +1536,7 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 	}
 
 	//	explicit stop
-	*GetV3dReg(V3D_CT1CS) = 0x20;
+	//*GetV3dReg(V3D_CT1CS) = 0x20;
 
 	return true;
 }
@@ -1933,7 +1930,7 @@ CAPI int notmain ( void )
 	};
 	
 	
-	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin), true );
+	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin) * 1024, true );
 	DebugAlloc( TileBins, "Tile Bins" );
 /*
 	if ( !TileBins.Unlock() )
@@ -1964,12 +1961,11 @@ CAPI int notmain ( void )
 	TGpuMemory Program4( 4096, true );
 	DebugAlloc( Program4, "Program4" );
 
-	return 1;
 	
 	uint32_t Tick = 0;
 	while ( true )
 	{
-		Display.DrawString( 0, 0, "Tick ");
+		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Tick ");
 		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
 		
 		Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
