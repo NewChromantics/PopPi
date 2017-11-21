@@ -9,6 +9,12 @@ uint32_t TKernel::mGpuMemorySize = 0xbad6bad7;
 
 #define ENABLE_DRAWING
 
+#define CHECKERBOARD_SIZE		16
+#define CHECKERBOARD_COLOURA	RGBA( 247,191,9,255 )
+#define CHECKERBOARD_COLOURB	RGBA( 249,221,127,255 )
+// = RGBA( 56,185,255,255 );
+//Colours[1] = RGBA( 199,214,221,255 );
+
 //-------------------------------------------------------------------------
 //-------------------------------------------------------------------------
 
@@ -234,7 +240,7 @@ public:
 	void		SetPixel(int Index,uint32_t Colour);
 	void		FillRow(int y,uint32_t Colour);
 	void		FillPixels(uint32_t Colour);
-	void		FillPixelsCheckerBoard(int SquareSize);
+	void		FillPixelsCheckerBoard(int SquareSize,uint32_t ColourA,uint32_t ColourB);
 	
 	void		DrawNumber(int x,int y,uint32_t Number);
 	void		DrawHex(int x,int y,uint32_t Number);
@@ -733,7 +739,7 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	mScreenBuffer = TKernel::GetCpuAddress( DisplayInfo.mPixelBuffer );
 	//	todo: if addr=0, loop
 	
-	FillPixelsCheckerBoard(32);
+	FillPixelsCheckerBoard(CHECKERBOARD_SIZE,CHECKERBOARD_COLOURA,CHECKERBOARD_COLOURB);
 	
 	//	testing
 	//Sleep(2000);
@@ -1117,11 +1123,11 @@ void TDisplay::FillPixels(uint32_t Colour)
 	}
 }
 	
-void TDisplay::FillPixelsCheckerBoard(int SquareSize)
+void TDisplay::FillPixelsCheckerBoard(int SquareSize,uint32_t ColourA,uint32_t ColourB)
 {
 	uint32_t Colours[2+TEST_PAD];
-	Colours[0] = RGBA( 56,185,255,255 );
-	Colours[1] = RGBA( 199,214,221,255 );
+	Colours[0] = ColourA;
+	Colours[1] = ColourB;
 	
 	auto* Pixels = mScreenBuffer;
 	for ( unsigned y=0;	y<mHeight;	y++ )
@@ -1885,7 +1891,7 @@ CAPI int notmain ( void )
 	//TDisplay Display( 1920, 1080, true );
 	TDisplay Display( 512, 512, true );
 	
-	Display.DrawString( 0, 0, "Hello world!");
+	Display.DrawString( 1, 1, "Hello world!");
 	
 	//	gr: alphabet test seems okay
 	/*
