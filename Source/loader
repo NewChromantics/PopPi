@@ -1,12 +1,43 @@
 
 MEMORY
 {
-    ram : ORIGIN = 0x8000, LENGTH = 0x1000000
+    ram : ORIGIN = 0x8000, LENGTH = 0x8000000
 }
 
 SECTIONS
 {
-    .text : { *(.text*) } > ram
-    .bss : { *(.bss*) } > ram
+/* code */
+    .text :
+	{
+		. = ALIGN(4);
+		*(.text*)
+	} > ram
+
+
+/* static uninitialised data */
+.bss :
+{
+. = ALIGN(4);
+*(.bss*)
+} > ram
+
+
+/* initialised data */
+.data :
+{
+. = ALIGN(4);
+*(.data*)
+} > ram
+
+
+/* const data */
+.rodata :
+{
+. = ALIGN(4);
+*(.rodata*)
+} > ram
+
+
+
 }
 
