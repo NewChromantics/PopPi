@@ -1,6 +1,14 @@
 #include "Kernel.h"
 #include "Sprites.h"
 
+
+uint32_t TKernel::mCpuMemoryBase = 0xbad0bad1;
+uint32_t TKernel::mCpuMemorySize = 0xbad2bad3;
+uint32_t TKernel::mGpuMemoryBase = 0xbad4bad5;
+uint32_t TKernel::mGpuMemorySize = 0xbad6bad7;
+
+#define ENABLE_DRAWING
+
 //-------------------------------------------------------------------------
 //-------------------------------------------------------------------------
 
@@ -89,7 +97,7 @@ extern "C"
 //#define V3D_BASE_ADDRESS	(0x3F000000 | 0xc00000)	//	pi2
 
 
-typedef uint32_t TTileBin;
+typedef uint8_t TTileBin;
 
 volatile uint32_t* GetV3dReg(int Register)
 {
@@ -215,15 +223,6 @@ static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
 enum class TGpuThread : uint32_t;
 
 
-class TKernel
-{
-public:
-	TKernel();
-	
-	uint8_t*	AllocGpuMemory(uint32_t Size);
-};
-
-
 class TDisplay
 {
 public:
@@ -253,6 +252,11 @@ public:
 	
 	int			GetConsoleY();
 	int			GetConsoleX(bool NewLine=true);
+
+	uint8_t		GetTileWidth() const	{	return (mWidth%64)/64;	}	//	round down so we don't overflow pixel buffer
+	uint8_t		GetTileHeight() const	{	return (mHeight%64)/64;	}	//	round down so we don't overflow pixel buffer
+
+
 	
 public:
 	int			mConsoleX;
@@ -279,14 +283,13 @@ public:
 	void 		Free();
 
 	size_t		GetSize() const			{	return mSize;	}
-	uint8_t*	GetCpuAddress() const	{	return Kernel::GetCpuAddress(mLockedAddress);	}
-	uint8_t*	GetGpuAddress() const	{	return Kernel::GetGpuAddress(mLockedAddress);	}
+	uint8_t*	GetCpuAddress() const	{	return TKernel::GetCpuAddress(mLockedAddress);	}
+	uint8_t*	GetGpuAddress() const	{	return TKernel::GetGpuAddress(mLockedAddress);	}
 	
-private:
 	uint8_t*	Lock();
-	void		Unlock();
+	bool		Unlock();
 	
-private:
+public:
 	uint32_t	mHandle;
 	size_t		mSize;
 	uint8_t*	mLockedAddress;
@@ -296,9 +299,9 @@ private:
 enum class TGpuMemFlags : uint32_t
 {
 	Discardable		= 1<<0,	//	can be resized to 0 at any time. Use for cached data
-	Normal			= 0<<2,	//	normal allocating alias. Don't use from ARM
+	Normal			= 0,	//	normal allocating alias. Don't use from ARM
 	Direct			= 1<<2,	//	0xC alias uncached
-	Coherent		= 2<<2,	//	0x8 alias. Non-allocating in L2 but coherent
+	Coherent		= 1<<3,	//	same as 2<<2	0x8 alias. Non-allocating in L2 but coherent
 	L1NonAllocating	= Direct | Coherent,	//	Allocating in L2
 	ZeroMemory		= 1<<4,	//	initialise all zero
 	NoInit			= 1<<5,	//	don't initialise (default is initialise to all ones)
@@ -323,8 +326,9 @@ namespace TMailbox
 	enum class TChannel	: uint32_t;
 	enum class TTag		: uint32_t;
 	
+	//	returns amount of data returned
 	template<size_t PAYLOADSIZE>
-	void		SetProperty(TTag Tag,TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool Read=true);
+	int			SetProperty(TTag Tag,TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool Read=true);
 }
 
 
@@ -338,6 +342,9 @@ enum class TMailbox::TChannel : uint32_t
 	
 enum class TMailbox::TTag : uint32_t
 {
+	GetCpuBaseAddress	= 0x00010005,	//	arm
+	GetGpuBaseAddress	= 0x00010006,	//	videocore
+
 	AllocGpuMemory	= 0x3000c,
 	FreeGpuMemory	= 0x3000f,
 	LockGpuMemory	= 0x3000d,
@@ -357,9 +364,9 @@ enum class TMailbox::TTag : uint32_t
 #define MAILBOX_STATUS_EMPTY 0x40000000
 
 
-void MailboxWrite(void* Data,TMailbox::TChannel Channel)
+void MailboxWrite(volatile void* Data,TMailbox::TChannel Channel)
 {
-	Data = Kernel::GetGpuAddress( Data );
+	Data = TKernel::GetGpuAddress( Data );
 	uint32_t BufferAddress = (uint32_t)Data;
 	
 	auto ChannelBitMask = (1<<4)-1;
@@ -385,7 +392,7 @@ void MailboxWrite(void* Data,TMailbox::TChannel Channel)
 		//uint32_t MailboxResponse = GET32(mailbox+20);
 		uint32_t MailboxResponse = MAILBOX0->sender;
 		//	break when we... have NO response waiting??
-		bool StatusBusy = (MailboxResponse & MAILBOX_STATUS_BUSY) == MAILBOX_STATUS_BUSY;
+		bool StatusBusy = bool_cast(MailboxResponse & MAILBOX_STATUS_BUSY);
 		if( !StatusBusy )
 			break;
     }
@@ -406,7 +413,7 @@ uint32_t MailboxRead(TMailbox::TChannel Channel)
         {
 			//	gr: sender, not status, suggests this struct may be off...
 			uint32_t MailboxResponse = MAILBOX0->sender;
-			bool StatusEmpty = (MailboxResponse & MAILBOX_STATUS_EMPTY) == MAILBOX_STATUS_EMPTY;
+			bool StatusEmpty = bool_cast(MailboxResponse & MAILBOX_STATUS_EMPTY);
             if ( !StatusEmpty )
 				break;
         }
@@ -549,11 +556,27 @@ bool mmu_section(unsigned int add,unsigned int flags)
 
 void exit(int Error)
 {
-	
 }
+
 
 TKernel::TKernel()
 {
+	
+	//	read base addresses
+	{
+		uint32_t Data[2];
+		TMailbox::SetProperty( TMailbox::TTag::GetCpuBaseAddress, TMailbox::TChannel::Gpu, Data );
+		mCpuMemoryBase = Data[0];
+		mCpuMemorySize = Data[1];
+	}
+	{
+		uint32_t Data[2];
+		TMailbox::SetProperty( TMailbox::TTag::GetGpuBaseAddress, TMailbox::TChannel::Gpu, Data );
+		mGpuMemoryBase = Data[0];
+		mGpuMemorySize = Data[1];
+	}
+
+	
 	/*
 	//	terminal debug
 	uart_init();
@@ -691,10 +714,10 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	MailboxRead( Channel );
 
 	//	read new contents of struct
-	mScreenBuffer = DisplayInfo.mPixelBuffer;
+	mScreenBuffer = TKernel::GetCpuAddress( DisplayInfo.mPixelBuffer );
 	//	todo: if addr=0, loop
 	
-	FillPixelsCheckerBoard(10);
+	FillPixelsCheckerBoard(32);
 	
 	//	testing
 	//Sleep(2000);
@@ -829,7 +852,7 @@ CONTROL_LIST_BIN_END:
 
 int TDisplay::GetConsoleY()
 {
-	return mConsoleY;
+	return mConsoleY % (mHeight-10);
 }
 
 int TDisplay::GetConsoleX(bool NewLine)
@@ -839,6 +862,16 @@ int TDisplay::GetConsoleX(bool NewLine)
 		mConsoleY += 10;
 		mConsoleX = 1;
 	}
+	
+	auto Right = mWidth - 10;
+	
+	//	wrap
+	if ( mConsoleX >= Right )
+	{
+		mConsoleX = 1;
+		mConsoleY += 10;
+	}
+	
 	return mConsoleX;
 }
 
@@ -905,9 +938,9 @@ void TDisplay::GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThrea
 	auto RegStatus = RegStatuss[static_cast<uint32_t>(GpuThread)];
 	
 	//	tell thread0 to start at our instructions
-	*GetV3dReg(RegStart) = Kernel::GetGpuAddress32(Memory);
+	*GetV3dReg(RegStart) = TKernel::GetGpuAddress32(Memory);
 	//	set end address, also starts execution
-	*GetV3dReg(RegEnd) = Kernel::GetGpuAddress32(Memory) + ExecuteSize;
+	*GetV3dReg(RegEnd) = TKernel::GetGpuAddress32(Memory) + ExecuteSize;
 	
 
 	//	Wait a second to be sure the contorl list execution has finished
@@ -986,10 +1019,16 @@ void TDisplay::DrawChar(int x,int y,int Char,int& Width)
 	mConsoleY = y;
 	mConsoleX = x + Width;
 }
+	
+#define TEST_PAD	100
 
 void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 {
-	int DigitsReversed[20];
+#if !defined(ENABLE_DRAWING)
+	return;
+#endif
+
+	int DigitsReversed[20+TEST_PAD];
 	DigitsReversed[0] = 0;
 	int DigitCount = 0;
 	if ( Number == 0 )
@@ -1001,7 +1040,7 @@ void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 	};
 	
 	
-	char Digits[20];
+	char Digits[20+TEST_PAD];
 	for ( int i=DigitCount-1;  i>=0;  i-- )
 	{
 		auto di = DigitCount - 1 - i;
@@ -1014,7 +1053,11 @@ void TDisplay::DrawNumber(int x,int y,uint32_t Number)
 
 void TDisplay::DrawHex(int x,int y,uint32_t Number)
 {
-	char Digits[11];
+#if !defined(ENABLE_DRAWING)
+	return;
+#endif
+
+	char Digits[11 + TEST_PAD];
 	Digits[0] = '0';
 	Digits[1] = '*';
 	for ( int i=0;	i<8;	i++ )
@@ -1033,6 +1076,10 @@ void TDisplay::DrawHex(int x,int y,uint32_t Number)
 
 void TDisplay::DrawString(int x,int y,const char* String)
 {
+#if !defined(ENABLE_DRAWING)
+	return;
+#endif
+	
 	int MaxSize = 400;
 	while ( MaxSize-- > 0 )
 	{
@@ -1056,7 +1103,7 @@ void TDisplay::FillPixels(uint32_t Colour)
 	
 void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 {
-	uint32_t Colours[2];
+	uint32_t Colours[2+TEST_PAD];
 	Colours[0] = RGBA( 56,185,255,255 );
 	Colours[1] = RGBA( 199,214,221,255 );
 	
@@ -1074,20 +1121,6 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 			Pixels[p] = Colours[ColourIndex];
 		}
 	}
-
-	DrawString( GetConsoleX(), GetConsoleY(), "one");
-	Sleep(10);
-	DrawString( GetConsoleX(), GetConsoleY(), "two");
-	Sleep(10);
-	DrawString( GetConsoleX(), GetConsoleY(), "three");
-	Sleep(10);
-	DrawString( GetConsoleX(), GetConsoleY(), "four");
-	Sleep(10);
-
-	DrawString( GetConsoleX(), GetConsoleY(), "Screen Buffer address = ");
-	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)mScreenBuffer );
-	
-	DrawString( GetConsoleX(), GetConsoleY(),"Hello World! 1234567890 abcdefghijklmnopqrstuvxwyz!=(*).,'#@bleh");
 }
 
 
@@ -1226,11 +1259,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 //#define ENABLE_TRIANGLES
 	
 	//	CONTROL_LIST_BIN_STRUCT
-	auto* p = Kernel::GetCpuAddress((uint8_t*)ProgramMemory);
-	
-	auto TileWidth = mWidth / 64;
-	auto TileHeight = mHeight / 64;
-	
+	auto* p = TKernel::GetCpuAddress((uint8_t*)ProgramMemory);
 	
 	
 	DrawString( GetConsoleX(), GetConsoleY(), "TileBin*  = ");
@@ -1253,8 +1282,8 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, (uint32_t)TileBinMemory );
 	addword(&p, TileBinMemorySize );
 	addword(&p, (uint32_t)TileStateMemory );
-	addbyte(&p, TileWidth);
-	addbyte(&p, TileHeight);
+	addbyte(&p, GetTileWidth() );
+	addbyte(&p, GetTileHeight() );
 	uint8_t Flags = AUTO_INIT_TILE_STATE_CMD;
 	addbyte(&p, Flags);
 	
@@ -1290,8 +1319,8 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	//	wont render without
 	//	Viewport_Offset
 	addbyte(&p, 0x67);
-	addshort(&p, 10);
-	addshort(&p, 10);
+	addshort(&p, 0);
+	addshort(&p, 0);
 	
 #if defined(ENABLE_TRIANGLES)
 	//	NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
@@ -1310,10 +1339,10 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, MaxIndex);
 #endif
 	//	Flush
-	addbyte(&p, 0x4);	//	flush
-	//addbyte(&p, 0x5);	//	flush all state
-	//addbyte(&p, 1);	//	nop
-	//addbyte(&p, 0);	//	halt
+	//addbyte(&p, 0x4);	//	flush
+	addbyte(&p, 0x5);	//	flush all state
+	addbyte(&p, 1);	//	nop
+	addbyte(&p, 0);	//	halt
 
 	
 
@@ -1341,8 +1370,8 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	//	explicit stop
 	*GetV3dReg(V3D_CT0CS) = 0x20;
 
-	*GetV3dReg(V3D_CT0CA) = Kernel::GetGpuAddress32(ProgramMemory);
-	*GetV3dReg(V3D_CT0EA) = Kernel::GetGpuAddress32(ProgramMemoryEnd);
+	*GetV3dReg(V3D_CT0CA) = TKernel::GetGpuAddress32(ProgramMemory);
+	*GetV3dReg(V3D_CT0EA) = TKernel::GetGpuAddress32(ProgramMemoryEnd);
 	
 	if ( !WaitForThread(0) )
 		return false;
@@ -1392,7 +1421,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 	//	Tile_Rendering_Mode_Configuration
 #define Frame_Buffer_Color_Format_RGBA8888 0x4
 	addbyte( &Program, 113 );
-	addword( &Program, Kernel::GetCpuAddress32(mScreenBuffer) );
+	addword( &Program, TKernel::GetCpuAddress32(mScreenBuffer) );
 	addshort( &Program, mWidth );	//	controls row stride
 	addshort( &Program, mHeight );
 	addshort( &Program, Frame_Buffer_Color_Format_RGBA8888 );
@@ -1414,9 +1443,9 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 	//dh data16 ; Control ID Data Record Short: (Bit 0..15)
 	//dw address + data32 ; Control ID Data Record Word: Memory Base Address Of Frame/Tile Dump Buffer (In Multiples Of 16 Bytes) (Bit 20..47), Data Record (Bit 16..19)
 
-	auto TileWidth = mWidth / 64;
-	auto TileHeight = mHeight / 64;
-
+	auto TileWidth = GetTileWidth();
+	auto TileHeight = GetTileHeight();
+	
 	for ( unsigned ty=0;	ty<TileHeight;	ty++ )
 	{
 		for ( unsigned tx=0;	tx<TileWidth;	tx++ )
@@ -1431,7 +1460,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 			int TileIndex = tx + ( TileWidth * ty );
 			auto* Address = &TileBinMemory[ TileIndex * TILE_BIN_BLOCK_SIZE ];
 			addbyte( &Program, 17 );
-			addword( &Program, Kernel::GetGpuAddress32(Address) );
+			addword( &Program, TKernel::GetGpuAddress32(Address) );
 			
 			bool LastTile = (tx==TileWidth-1) && (ty==TileHeight-1);
 			if ( LastTile )
@@ -1457,7 +1486,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 
 bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 {
-	auto* ProgramMemoryEnd = SetupRenderControlProgram( Kernel::GetCpuAddress((uint8_t*)ProgramMemory), (uint32_t*) TileBinMemory );
+	auto* ProgramMemoryEnd = SetupRenderControlProgram( TKernel::GetCpuAddress((uint8_t*)ProgramMemory), TileBinMemory );
 	
 	auto Length = (int)ProgramMemoryEnd - (int)ProgramMemory;
 	if ( Length == 0 )
@@ -1471,8 +1500,8 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 		return false;
 	
 	
-	*GetV3dReg(V3D_CT1CA) = Kernel::GetGpuAddress32(ProgramMemory);
-	*GetV3dReg(V3D_CT1EA) = Kernel::GetGpuAddress32(ProgramMemoryEnd);
+	*GetV3dReg(V3D_CT1CA) = TKernel::GetGpuAddress32(ProgramMemory);
+	*GetV3dReg(V3D_CT1EA) = TKernel::GetGpuAddress32(ProgramMemoryEnd);
 	
 	while ( true )
 	{
@@ -1699,16 +1728,19 @@ void DrawScreen(TDisplay& Display,int Tick)
 
 	
 
+//	returns number of elements returned
 template<size_t PAYLOADSIZE>
-void TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool ReadData)
+int TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool ReadData)
 {
-	uint32_t Data[PAYLOADSIZE + 6] __attribute__ ((aligned(16)));
+	auto Tag32 = static_cast<uint32_t>( Tag );
+	volatile uint32_t Data[PAYLOADSIZE + 6] __attribute__ ((aligned(16)));
 	
 	Data[0] = sizeof(Data);
 	Data[1] = 0x00000000;	// process request
-	Data[2] = static_cast<uint32_t>( Tag );
+	
+	Data[2] = Tag32;
 	Data[3] = PAYLOADSIZE * sizeof(uint32_t);	//	size of buffer
-	Data[4] = PAYLOADSIZE * sizeof(uint32_t);	//	size of data
+	Data[4] = 0x0;	//	size of data returned. needs to be 0 to send
 	for ( unsigned i=0;	i<PAYLOADSIZE;	i++ )
 	{
 		Data[5+i] = Payload[i];
@@ -1719,9 +1751,16 @@ void TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_
 	MailboxWrite( Data, Channel );
 	
 	if ( !ReadData )
-		return;
+		return 0;
 	
 	MailboxRead( Channel );
+	
+	auto ReturnedTag = Data[2];
+	if ( ReturnedTag != static_cast<uint32_t>( Tag ) )
+		return -1;
+	
+#define BIT_RESPONSE_VALID	(1<<31)
+	auto ReturnedDataSize = Data[4] & ~BIT_RESPONSE_VALID;
 	
 	//	read back and return
 	for ( unsigned i=0;	i<PAYLOADSIZE;	i++ )
@@ -1729,6 +1768,7 @@ void TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_
 		Payload[i] = Data[5+i];
 	}
 
+	return ReturnedDataSize / sizeof(uint32_t);
 }
 
 
@@ -1738,15 +1778,21 @@ TGpuMemory::TGpuMemory(uint32_t Size) :
 	mLockedAddress	( nullptr )
 {
 	//	gr: most things need to be aligned to 16 bytes
-	auto Align4k = 0x1000;
-	auto Flags = TGpuMemFlags::Coherent | TGpuMemFlags::ZeroMemory;
+	auto AlignBytes = 0x1000;
+	//auto AlignBytes = 16;
+	auto Flags = (uint32_t)(TGpuMemFlags::Coherent | TGpuMemFlags::ZeroMemory);
 	
 	uint32_t Data[3];
 	Data[0] = Size;
-	Data[1] = Align4k;
-	Data[2] = static_cast<uint32_t>(Flags);
+	Data[1] = AlignBytes;
+	Data[2] = Flags;
 	
-	TMailbox::SetProperty( TMailbox::TTag::AllocGpuMemory, TMailbox::TChannel::Gpu, Data );
+	auto ReturnSize = TMailbox::SetProperty( TMailbox::TTag::AllocGpuMemory, TMailbox::TChannel::Gpu, Data );
+	if ( ReturnSize != 1 )
+	{
+		mHandle = 0x0bad2000 | ReturnSize;
+		return;
+	}
 
 	mHandle = Data[0];
 	
@@ -1768,21 +1814,28 @@ uint8_t* TGpuMemory::Lock()
 	uint32_t Data[1];
 	Data[0] = mHandle;
 		
-	TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
+	auto ResponseSize = TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
+	if ( ResponseSize != 1 )
+		return (uint8_t*)(uint32_t)(0xbad10000|ResponseSize);
 	
 	auto Address = Data[0];
 	return (uint8_t*)Address;
 }
 	
 	
-void TGpuMemory::Unlock()
+bool TGpuMemory::Unlock()
 {
 	uint32_t Data[1];
 	Data[0] = mHandle;
 		
-	TMailbox::SetProperty( TMailbox::TTag::LockGpuMemory, TMailbox::TChannel::Gpu, Data );
+	auto ResponseSize = TMailbox::SetProperty( TMailbox::TTag::UnlockGpuMemory, TMailbox::TChannel::Gpu, Data );
+	if ( ResponseSize != 1 )
+		return false;
+
+	bool Success = (Data[0] == 0);
 	
 	mLockedAddress = nullptr;
+	return Success;
 }
 	
 	
@@ -1794,12 +1847,65 @@ CAPI int notmain ( void )
 	TKernel Kernel;
 	//TDisplay Display( 1280, 720, true );
 	//TDisplay Display( 1920, 1080, true );
-	TDisplay Display( 640, 480, true );
+	TDisplay Display( 512, 512, true );
+	
+	Display.DrawString( 0, 0, "Hello world!");
+	
+	//	gr: alphabet test seems okay
+	/*
+	char Alphabet[] = "abdefghijklmnopqrstuvwxyz0123456789():,.*!";
+	for ( int i=0;	i<10000;	i++ )
+	{
+		auto Char = Alphabet[ i % sizeof(Alphabet)];
+		char String[2] = { Char, 0 };
+		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), String );
+	}
+	*/
+	
+
+	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Cpu base address: ");
+	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), TKernel::mCpuMemoryBase );
+	Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), " size: ");
+	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), TKernel::mCpuMemorySize );
+	
+	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Gpu base address: ");
+	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), TKernel::mGpuMemoryBase );
+	Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), " size: ");
+	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), TKernel::mGpuMemorySize );
+	
+	
+	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Screen Buffer address = ");
+	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), (uint32_t)Display.mScreenBuffer );
+	
+	
+	auto DebugAlloc = [&Display](TGpuMemory& Mem,const char* Name)
+	{
+		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), Name );
+		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), "  mem handle: ");
+		Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), Mem.mHandle );
+		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), ", address: ");
+		auto Addr =(uint32_t)Mem.GetGpuAddress();
+		Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), Addr );
+	};
+	
 	
 	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin) );
+	DebugAlloc( TileBins, "Tile Bins" );
+
+	if ( !TileBins.Unlock() )
+		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Tile bin unlock failed" );
+
+	//	gr: something around here messes with the const strings
+	//		moving code around does it
+	
 	TGpuMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE );
+	DebugAlloc( TileState, "Tile State" );
+	
 	TGpuMemory Program0( 4096 );
+	DebugAlloc( Program0, "Program0" );
+
 	TGpuMemory Program1( 4096 );
+	DebugAlloc( Program1, "Program1" );
 
 	
 	uint32_t Tick = 0;
@@ -1808,27 +1914,27 @@ CAPI int notmain ( void )
 		Display.DrawString( 0, 0, "Tick ");
 		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
 		
-		Display.mClearColour = RGBA( Tick % 256, 0, 255, 255 );
+		Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
 		
 		if ( !Display.SetupBinControl( Program0.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()), TileBins.GetSize(), TileState.GetGpuAddress() ) )
 		{
-			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
+			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
 			Sleep(10);
 		}
 		else
 		{
-			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl success");
+			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl success");
 		}
 
 		//	gr this actually draws...
 		if ( !Display.SetupRenderControl( Program1.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()) ) )
 		{
-			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
+			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
 			Sleep(10);
 		}
 		else
 		{
-			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl success");
+			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl success");
 		}
 		
 		Tick++;

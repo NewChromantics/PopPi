@@ -38,7 +38,7 @@ constexpr size_t length(char const (&)[N])
 	return N-1;
 }
 
-constexpr int GetSpriteAtlasSize()
+int GetSpriteAtlasSize()
 {
 	return length(RawSpriteAtlas);
 }
@@ -78,15 +78,24 @@ void ParseSpriteAtlas(char* Atlas)
 	}
 }
 
+int GetSpriteAtlasCharacterCount()
+{
+	//	make sure we don't write over data past here
+	auto CharacterCount = (GetSpriteAtlasSize()-SPRITE_ATLAS_PREFIX_SIZE);
+	CharacterCount -= CharacterCount % SPRITE_ATLAS_BLOCK_SIZE;
+	CharacterCount /= SPRITE_ATLAS_BLOCK_SIZE;
+	return CharacterCount;
+}
+
 
 //	gr: this isn't initialising to 0
-int SpriteLookupInitialised = 0;
+//	gr: some debugging suggests global 0's become 0x55555555
+//	this is 0x00020100
+int SpriteLookupInitialised = false;
 
 void ParseSpriteAtlas()
 {
-	const int MAGIC = 65154;
-
-	if ( SpriteLookupInitialised == MAGIC )
+	if ( SpriteLookupInitialised == true )
 		return;
 	
 	//	init
@@ -95,7 +104,7 @@ void ParseSpriteAtlas()
 	
 	char FirstCharacter;
 	
-	for ( int a=0;	a<GetSpriteAtlasSize()/SPRITE_ATLAS_BLOCK_SIZE;	a++ )
+	for ( int a=0;	a<GetSpriteAtlasCharacterCount();	a++ )
 	{
 		auto* Atlas = (char*)RawSpriteAtlas;
 		Atlas += SPRITE_ATLAS_PREFIX_SIZE;
@@ -122,7 +131,7 @@ void ParseSpriteAtlas()
 			SpriteLookup[i] = SpriteLookup[FirstCharacter];
 	}
 	
-	SpriteLookupInitialised = MAGIC;
+	SpriteLookupInitialised = true;
 }
 
 
