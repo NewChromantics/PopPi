@@ -88,6 +88,9 @@ extern "C"
 #define V3D_BASE_ADDRESS	(0x20000000 | 0xc00000)	//	pi1 <-- gr: ident is only correct on this
 //#define V3D_BASE_ADDRESS	(0x3F000000 | 0xc00000)	//	pi2
 
+
+typedef uint32_t TTileBin;
+
 volatile uint32_t* GetV3dReg(int Register)
 {
 	uint32_t Addr = V3D_BASE_ADDRESS;
@@ -244,9 +247,9 @@ public:
 	void		GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread);
 	void		GpuNopTest();
 	
-	bool		SetupBinControl();
-	uint8_t*	SetupRenderControlProgram(uint8_t* Program);
-	bool		SetupRenderControl();
+	bool		SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory);
+	uint8_t*	SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory);
+	bool		SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory);
 	
 	int			GetConsoleY();
 	int			GetConsoleX(bool NewLine=true);
@@ -275,6 +278,7 @@ public:
 	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
 	void 		Free();
 
+	size_t		GetSize() const			{	return mSize;	}
 	uint8_t*	GetCpuAddress() const	{	return Kernel::GetCpuAddress(mLockedAddress);	}
 	uint8_t*	GetGpuAddress() const	{	return Kernel::GetGpuAddress(mLockedAddress);	}
 	
@@ -284,6 +288,7 @@ private:
 	
 private:
 	uint32_t	mHandle;
+	size_t		mSize;
 	uint8_t*	mLockedAddress;
 };
 
@@ -697,18 +702,18 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 
 	if ( EnableGpu )
 	{
-		Sleep(1000);
+		Sleep(100);
 	
 	
 		SetupGpu();
 	
-		Sleep(1000);
+		Sleep(100);
 		
 		//	gr: without this... error... not sure why this affects things
 		//	see if we have control again or if setup is stuck
 		//DrawScreen( *this, 100 );
 		
-		Sleep(1000);
+		Sleep(100);
 	}
 	
 	//	all from kernel.asm
@@ -1071,13 +1076,13 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 	}
 
 	DrawString( GetConsoleX(), GetConsoleY(), "one");
-	Sleep(1);
+	Sleep(10);
 	DrawString( GetConsoleX(), GetConsoleY(), "two");
-	Sleep(1);
+	Sleep(10);
 	DrawString( GetConsoleX(), GetConsoleY(), "three");
-	Sleep(1);
+	Sleep(10);
 	DrawString( GetConsoleX(), GetConsoleY(), "four");
-	Sleep(1);
+	Sleep(10);
 
 	DrawString( GetConsoleX(), GetConsoleY(), "Screen Buffer address = ");
 	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)mScreenBuffer );
@@ -1091,14 +1096,16 @@ void TDisplay::FillPixelsCheckerBoard(int SquareSize)
 #define TILE_STRUCT_SIZE	48
 #define AUTO_INIT_TILE_STATE_CMD	(1<<2)
 
-#define TILE_BIN_BLOCK_SIZE	32	//	gr; if not 32, there's flags for 64,128,256
-uint32_t TileBin[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE]  __attribute__ ((aligned(16)));
-uint8_t TileState[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
+
+#define TILE_BIN_BLOCK_SIZE	(32)	//	gr; if not 32, there's flags for 64,128,256
+	/*
+uint32_t gTileBin[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE]  __attribute__ ((aligned(16)));
+uint8_t gTileState[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
 //static volatile uint32_t* TileBin = (uint32_t*)0x00400000;
 //static volatile uint8_t* TileState = (uint8_t*)00500000;
-uint8_t Program0[4096*4]  __attribute__ ((aligned(16)));
-uint8_t Program1[4096*4]  __attribute__ ((aligned(16)));
-	
+uint8_t gProgram0[4096*4]  __attribute__ ((aligned(16)));
+uint8_t gProgram1[4096*4]  __attribute__ ((aligned(16)));
+	*/
 //	128bit align
 uint8_t NV_SHADER_STATE_RECORD[200]  __attribute__ ((aligned(16)));
 uint32_t FRAGMENT_SHADER_CODE[12*4] __attribute__ ((aligned(16)))=
@@ -1214,21 +1221,23 @@ bool WaitForThread(int ThreadIndex)
 }
 
 	
-bool TDisplay::SetupBinControl()
+bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
 {
 //#define ENABLE_TRIANGLES
 	
 	//	CONTROL_LIST_BIN_STRUCT
-	auto* p = Program0;
+	auto* p = Kernel::GetCpuAddress((uint8_t*)ProgramMemory);
 	
 	auto TileWidth = mWidth / 64;
 	auto TileHeight = mHeight / 64;
 	
+	
+	
 	DrawString( GetConsoleX(), GetConsoleY(), "TileBin*  = ");
-	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileBin );
+	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileBinMemory );
 	
 	DrawString( GetConsoleX(), GetConsoleY(), "TileState*= ");
-	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileState );
+	DrawHex( GetConsoleX(false), GetConsoleY(), (uint32_t)TileStateMemory );
 	
 	DrawString( GetConsoleX(), GetConsoleY(), "VERTEX_INDEXES = ");
 	DrawNumber( GetConsoleX(false), GetConsoleY(), VERTEX_INDEXES[0] );
@@ -1241,9 +1250,9 @@ bool TDisplay::SetupBinControl()
 	
 	//	Tile_Binning_Mode_Configuration
 	addbyte(&p, 112);
-	addword(&p, (uint32_t)TileBin );
-	addword(&p, sizeof(TileBin) );
-	addword(&p, (uint32_t)TileState );
+	addword(&p, (uint32_t)TileBinMemory );
+	addword(&p, TileBinMemorySize );
+	addword(&p, (uint32_t)TileStateMemory );
 	addbyte(&p, TileWidth);
 	addbyte(&p, TileHeight);
 	uint8_t Flags = AUTO_INIT_TILE_STATE_CMD;
@@ -1309,7 +1318,7 @@ bool TDisplay::SetupBinControl()
 	
 
 	
-	auto* Program0End = p;
+	auto* ProgramMemoryEnd = p;
 	
 	/*
 	//	reset thread...
@@ -1332,8 +1341,8 @@ bool TDisplay::SetupBinControl()
 	//	explicit stop
 	*GetV3dReg(V3D_CT0CS) = 0x20;
 
-	*GetV3dReg(V3D_CT0CA) = (uint32_t)Program0;
-	*GetV3dReg(V3D_CT0EA) = (uint32_t)Program0End;
+	*GetV3dReg(V3D_CT0CA) = Kernel::GetGpuAddress32(ProgramMemory);
+	*GetV3dReg(V3D_CT0EA) = Kernel::GetGpuAddress32(ProgramMemoryEnd);
 	
 	if ( !WaitForThread(0) )
 		return false;
@@ -1362,7 +1371,7 @@ bool TDisplay::SetupBinControl()
 	
 	
 
-uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
+uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory)
 {
 	//uint32_t ClearZMask = 0xffff;
 	//uint32_t ClearVGMask = 0xff;
@@ -1408,9 +1417,9 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 	auto TileWidth = mWidth / 64;
 	auto TileHeight = mHeight / 64;
 
-	for ( int ty=0;	ty<TileHeight;	ty++ )
+	for ( unsigned ty=0;	ty<TileHeight;	ty++ )
 	{
-		for ( int tx=0;	tx<TileWidth;	tx++ )
+		for ( unsigned tx=0;	tx<TileWidth;	tx++ )
 		{
 			//	set current tile
 			addbyte( &Program, 115 );
@@ -1420,9 +1429,9 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 			//	branch (BRANCH?? these bins must be generated instructions or something)
 			//	Branch_To_Sub_List
 			int TileIndex = tx + ( TileWidth * ty );
-			auto* Address = &TileBin[ TileIndex * TILE_BIN_BLOCK_SIZE ];
+			auto* Address = &TileBinMemory[ TileIndex * TILE_BIN_BLOCK_SIZE ];
 			addbyte( &Program, 17 );
-			addword( &Program, (uint32_t)Address );
+			addword( &Program, Kernel::GetGpuAddress32(Address) );
 			
 			bool LastTile = (tx==TileWidth-1) && (ty==TileHeight-1);
 			if ( LastTile )
@@ -1446,11 +1455,11 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program)
 }
 
 
-bool TDisplay::SetupRenderControl()
+bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 {
-	auto* Program1End = SetupRenderControlProgram( Program1 );
+	auto* ProgramMemoryEnd = SetupRenderControlProgram( Kernel::GetCpuAddress((uint8_t*)ProgramMemory), (uint32_t*) TileBinMemory );
 	
-	auto Length = (int)Program1End - (int)Program1;
+	auto Length = (int)ProgramMemoryEnd - (int)ProgramMemory;
 	if ( Length == 0 )
 		return false;
 
@@ -1462,8 +1471,8 @@ bool TDisplay::SetupRenderControl()
 		return false;
 	
 	
-	*GetV3dReg(V3D_CT1CA) = (uint32_t)Program1;
-	*GetV3dReg(V3D_CT1EA) = (uint32_t)Program1End;
+	*GetV3dReg(V3D_CT1CA) = Kernel::GetGpuAddress32(ProgramMemory);
+	*GetV3dReg(V3D_CT1EA) = Kernel::GetGpuAddress32(ProgramMemoryEnd);
 	
 	while ( true )
 	{
@@ -1725,8 +1734,10 @@ void TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_
 
 TGpuMemory::TGpuMemory(uint32_t Size) :
 	mHandle			( 0 ),
+	mSize			( Size ),
 	mLockedAddress	( nullptr )
 {
+	//	gr: most things need to be aligned to 16 bytes
 	auto Align4k = 0x1000;
 	auto Flags = TGpuMemFlags::Coherent | TGpuMemFlags::ZeroMemory;
 	
@@ -1778,7 +1789,6 @@ void TGpuMemory::Unlock()
 
 
 
-
 CAPI int notmain ( void )
 {
 	TKernel Kernel;
@@ -1786,7 +1796,11 @@ CAPI int notmain ( void )
 	//TDisplay Display( 1920, 1080, true );
 	TDisplay Display( 640, 480, true );
 	
-	
+	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin) );
+	TGpuMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE );
+	TGpuMemory Program0( 4096 );
+	TGpuMemory Program1( 4096 );
+
 	
 	uint32_t Tick = 0;
 	while ( true )
@@ -1796,7 +1810,7 @@ CAPI int notmain ( void )
 		
 		Display.mClearColour = RGBA( Tick % 256, 0, 255, 255 );
 		
-		if ( !Display.SetupBinControl() )
+		if ( !Display.SetupBinControl( Program0.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()), TileBins.GetSize(), TileState.GetGpuAddress() ) )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
 			Sleep(10);
@@ -1807,7 +1821,7 @@ CAPI int notmain ( void )
 		}
 
 		//	gr this actually draws...
-		if ( !Display.SetupRenderControl() )
+		if ( !Display.SetupRenderControl( Program1.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()) ) )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
 			Sleep(10);
@@ -1818,7 +1832,7 @@ CAPI int notmain ( void )
 		}
 		
 		Tick++;
-		Sleep(1000);
+		Sleep(100);
 	}
 
 
