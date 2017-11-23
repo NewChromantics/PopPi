@@ -152,7 +152,13 @@ public:
 
 	TCanvas<uint32_t>	LockCanvas();
 	
+	void		WaitForVsync();
+	void		EnableVsync();
+	void		OnVsync();
+	
 public:
+	uint32_t	mVsyncCount;
+	bool		mVsyncEnabled;
 	uint32_t	mClearColour;
 	uint32_t	mWidth;
 	uint32_t	mHeight;

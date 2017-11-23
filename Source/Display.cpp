@@ -495,7 +495,7 @@ void TDisplay::GpuNopTest()
 uint8_t NV_SHADER_STATE_RECORD[200]  __attribute__ ((aligned(16)));
 uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 {
-	/*
+	
 	//	hackdriver
 	0x958e0dbf,
 	0xd1724823,// mov r0, vary; mov r3.8d, 1.0
@@ -515,7 +515,7 @@ uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 	0x100009e7, // nop; nop; nop
 	0x009e7000,
 	0x500009e7, // nop; nop; sbdone
-*/
+/*
 	
 	//	Fill Color Shader
 	EndianSwap32( 0x009E7000 ),
@@ -532,7 +532,8 @@ uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
 	EndianSwap32( 0x009E7000 ),
 	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
-	 
+	
+	*/
 };
 
 struct TVertex
@@ -546,23 +547,51 @@ struct TVertex
 	float		b;
 };
 static_assert( sizeof(TVertex) == 6*4, "Vertex is unexpected size");
-#define VERTEX_COUNT	3
+#define VERTEX_COUNT	9
 TVertex VERTEX_DATA[VERTEX_COUNT] __attribute__ ((aligned(16))) =
 {
 	{	EndianSwap16(1 * 16),	EndianSwap16(1 * 16),	1,1, 	1,0,0	},
 	{	EndianSwap16(100 * 16),	EndianSwap16(1 * 16),	1,1, 	0,1,0	},
 	{	EndianSwap16(100 * 16),	EndianSwap16(100 * 16),	1,1, 	0,0,1	},
+
+	{	EndianSwap16(101 * 16),	EndianSwap16(110 * 16),	1,1, 	1,1,0	},
+	{	EndianSwap16(200 * 16),	EndianSwap16(150 * 16),	1,1, 	0,1,1	},
+	{	EndianSwap16(200 * 16),	EndianSwap16(200 * 16),	1,1, 	1,0,1	},
+
+	{	EndianSwap16(4 * 16),	EndianSwap16(400 * 16),	1,1, 	1,0,1	},
+	{	EndianSwap16(550 * 16),	EndianSwap16(500 * 16),	1,1, 	1,1,1	},
+	{	EndianSwap16(600 * 16),	EndianSwap16(600 * 16),	1,1, 	0,0,0	},
 };
 
 uint8_t VERTEX_INDEXES[VERTEX_COUNT] __attribute__ ((aligned(16))) =
 {
 	0,1,2
 };
+uint8_t VERTEX_INDEXES_9[9] __attribute__ ((aligned(16))) =
+{
+	0,1,2,
+	3,4,5,
+	4,6,5,
+};
+
+//	shouldnt be used...
+uint32_t FragUniforms[100] __attribute__ ((aligned(16))) =
+{
+};
 
 uint8_t* SetupVertexShaderState()
 {
-	uint8_t* ShaderState = NV_SHADER_STATE_RECORD;
+	uint8_t* p = NV_SHADER_STATE_RECORD;
 	
+	addbyte(&p, 0x01);											// flags
+	addbyte(&p, 6 * 4);										// stride
+	addbyte(&p, 0xcc);											// num uniforms (not used)
+	addbyte(&p, 3);											// num varyings
+	addword(&p, (uint32_t)FRAGMENT_SHADER_CODE);			// Fragment shader code
+	addword(&p, (uint32_t)FragUniforms);			// Fragment shader uniforms
+	addword(&p, (uint32_t)VERTEX_DATA);
+	
+	/*
 	//	Flag Bits: 0 = Fragment Shader Is Single Threaded,
 	//	1 = Point Size Included In Shaded Vertex Data,
 	//	2 = Enable Clipping,
@@ -582,7 +611,7 @@ uint8_t* SetupVertexShaderState()
 	addword( &ShaderState, (uint32_t)FragShader );
 	addword( &ShaderState, (uint32_t)FragShaderUniforms );
 	addword( &ShaderState, (uint32_t)VertexData );
-	
+	*/
 	return NV_SHADER_STATE_RECORD;
 }
 
@@ -679,6 +708,21 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	};
 
 	
+	//	set primitive list format
+	uint8_t DataType = PrimitiveType::Triangles | (3<<4);
+	addbyte(&p, 56);
+	addbyte(&p, 0x32);
+	
+	
+	
+	//	Clip_Window - left, bottom, width, height
+	addbyte(&p, 102);
+	addshort(&p, 0 );
+	addshort(&p, 0 );
+	addshort(&p, mWidth );
+	addshort(&p, mHeight );
+
+	
 	//	state
 	//	Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
 	uint8_t Config[3];
@@ -697,25 +741,18 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addshort(&p, 0);
 
 	
-	
-	
-	//	Clip_Window - left, bottom, width, height
-	addbyte(&p, 102);
-	addshort(&p, 0 );
-	addshort(&p, 0 );
-	addshort(&p, mWidth );
-	addshort(&p, mHeight );
-	
-	uint8_t DataType = PrimitiveType::Triangles | (3<<4);
-	addbyte(&p, 56);
-	addbyte(&p, DataType);
-
 	//	primitive instance
 	//	No vertex shader (pre transformed verts)
 	//	NV_Shader_State NV_SHADER_STATE_RECORD ; NV Shader State (No Vertex Shading)
 	addbyte(&p, 65);
 	auto* VertexShaderState = SetupVertexShaderState();
 	addword(&p, (uint32_t)VertexShaderState );
+#define PRIM_TRIANGLE	4
+	addbyte(&p, 32);					// Indexed primitive list command
+	addbyte(&p, 0|PRIM_TRIANGLE);								// 8bit index, triangles
+	addword(&p, 9);											// Length
+	addword(&p, (uint32_t)VERTEX_INDEXES_9);				// address
+	addword(&p, 6);	//	last index
 	
 	/*
 	//	macro Indexed_Primitive_List data, length, address, maxindex { ; Control ID Code: Indexed Primitive List (OpenGL)
@@ -728,6 +765,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, (uint32_t)VERTEX_INDEXES );
 	addword(&p, MaxIndex);
 	 */
+	/*
 	//	vertex array (no indexes)
 #define PRIM_TRIANGLE	4
 	uint32_t VertexCount = 3;
@@ -736,7 +774,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addbyte(&p, PRIM_TRIANGLE);
 	addword(&p, VertexCount );
 	addword(&p, FirstIndex );
-	
+	*/
 
 	
 #if defined(BINTHREAD_FLUSH)
@@ -976,7 +1014,7 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 		{
 			//DrawString( GetConsoleX(), GetConsoleY(), "waiting for thread 1" );
 		}
-		TKernel::Sleep(100);
+		//TKernel::Sleep(100);
 	}
 	
 	//	explicit stop
@@ -986,6 +1024,37 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 }
 
 
+
+void TDisplay::WaitForVsync()
+{
+	if ( !mVsyncEnabled )
+		return;
+}
+
+void TDisplay::EnableVsync()
+{
+	//	https://github.com/rsta2/circle/blob/f5999e58f14b90204aafa7859428661cd01b22b1/lib/interrupt.cpp
+	/*
+	//	connect interrupt
+	uint32_t Irq = ARM_IRQ_SMI;
+	write32 (ARM_IC_IRQS_ENABLE (uint32_t), ARM_IRQ_MASK (uint32_t));
+	*/
+}
+
+void TDisplay::OnVsync()
+{
+	/*
+	mVsyncCount++;
+	
+	//	continue
+	0x3F000000
+//#define ARM_BASE_ADDRESS	0x7E000000
+#define ARM_BASE_ADDRESS	0x3F000000
+//#define ARM_BASE_ADDRESS	0x20000000
+	auto* SmiReset = (volatile uint32_t*)(ARM_BASE_ADDRESS|0x00600000) );
+	*SmiReset = 0;
+	 */
+}
 
 
 

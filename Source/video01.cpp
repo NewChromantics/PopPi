@@ -437,7 +437,7 @@ CAPI int notmain ( void )
 	TKernel Kernel;
 	//TDisplay Display( 1280, 720 );
 	//TDisplay Display( 1920, 1080 );
-	TDisplay Display( 512, 512 );
+	TDisplay Display( 640, 522 );
 	
 	Display.FillPixelsCheckerBoard(CHECKERBOARD_SIZE,CHECKERBOARD_COLOURA,CHECKERBOARD_COLOURB);
 
@@ -500,6 +500,7 @@ CAPI int notmain ( void )
 	
 	auto DebugMemoryDump = [](TALLOCMemory& Memory,const char* Name,TBlitter& Blitter,int ChunkSize)
 	{
+		return;
 		auto* Mem = Memory.GetBUFFERAddress();
 		
 		Blitter.DrawString( Blitter.GetConsoleX(), Blitter.GetConsoleY(), "Memory dump of ");
@@ -582,6 +583,7 @@ CAPI int notmain ( void )
 #endif
 #endif
 
+	bool DrawTick = true;
 	
 	uint32_t Tick = 0;
 	while ( true )
@@ -597,11 +599,14 @@ CAPI int notmain ( void )
 		auto* Program0Mem = Program0.GetBUFFERAddress();
 		auto* Program1Mem = Program1.GetBUFFERAddress();
 #endif
-		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Tick ");
-		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
+		if ( DrawTick )
+		{
+			Display.DrawString( Display.GetConsoleX(), Display.mHeight-9, "Tick ");
+			Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
+		}
 		
 		//Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
-		Display.mClearColour = RGBA( 255, Tick%255, 255, 255 );
+		Display.mClearColour = RGBA( Tick%255, (Tick/10)%255, (Tick/100)%255, 255 );
 	
 
 		if ( !Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem ) )
