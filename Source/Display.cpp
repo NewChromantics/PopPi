@@ -12,6 +12,13 @@
 #define RESET_THREAD_ON_ERROR
 #define STOP_THREAD_ON_ERROR
 
+//#define BINTHREAD_FLUSH
+#define BINTHREAD_FLUSHALL		//	wont render without
+//#define BINTHREAD_NOPHALT		//	adding causes thread1 error
+//#define RENDERTHREAD_FLUSH		//	adding causes thread1 error
+//#define RENDERTHREAD_FLUSHALL	//	adding causes thread1 error
+#define RENDERTHREAD_NOPHALT
+
 #define GetTHREADAddress32			GetUnmodifiedAddress32
 #define GetSCREENBUFFERAddress32	GetBusAddress32
 #define GetTILEBINAddress32			GetUnmodifiedAddress32
@@ -665,11 +672,17 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, (uint32_t)VERTEX_INDEXES );
 	addword(&p, MaxIndex);
 #endif
-	//	Flush
-	//addbyte(&p, 0x4);	//	flush
-	addbyte(&p, 0x5);	//	flush all state
+	
+#if defined(BINTHREAD_FLUSH)
+	addbyte(&p, 0x4);	//	flush
+#endif
+#if defined(BINTHREAD_FLUSHALL)
+	addbyte(&p, 0x5);	//	flush
+#endif
+#if defined(BINTHREAD_NOPHALT)
 	addbyte(&p, 1);	//	nop
 	addbyte(&p, 0);	//	halt
+#endif
 	
 	
 	
@@ -788,10 +801,18 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 		}
 	}
 	
-	addbyte(&Program, 0x5);	//	flush all state
-	
+#if defined(RENDERTHREAD_FLUSH)
+	addbyte(&Program, 0x4);	//	flush
+#endif
+#if defined(RENDERTHREAD_FLUSHALL)
+	addbyte(&Program, 0x5);	//	flush
+#endif
+#if defined(RENDERTHREAD_NOPHALT)
 	addbyte(&Program, 1);	//	nop
 	addbyte(&Program, 0);	//	halt
+#endif
+	
+	
 	
 	return Program;
 }

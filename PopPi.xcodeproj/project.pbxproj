@@ -18,6 +18,7 @@
 		BF5EC01F1FC70CD1002ABF16 /* Display.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Display.h; path = Source/Display.h; sourceTree = "<group>"; };
 		BF5EC0201FC70EE8002ABF16 /* Mailbox.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Mailbox.cpp; path = Source/Mailbox.cpp; sourceTree = "<group>"; };
 		BF5EC0211FC70EF3002ABF16 /* Mailbox.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Mailbox.h; path = Source/Mailbox.h; sourceTree = "<group>"; };
+		BF5EC0221FC73F02002ABF16 /* WorkingVideo01.cxx */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = WorkingVideo01.cxx; path = Source/WorkingVideo01.cxx; sourceTree = "<group>"; };
 		BF7026D41FBDE7D600354F35 /* periph.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = periph.c; path = Source/periph.c; sourceTree = "<group>"; };
 		BF7026D51FBDE7D600354F35 /* vectors.s */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; name = vectors.s; path = Source/vectors.s; sourceTree = "<group>"; };
 		BF7026D61FBDE7D600354F35 /* video01.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = video01.cpp; path = Source/video01.cpp; sourceTree = "<group>"; };
@@ -52,6 +53,7 @@
 				BF5EC01F1FC70CD1002ABF16 /* Display.h */,
 				BF5EC0201FC70EE8002ABF16 /* Mailbox.cpp */,
 				BF5EC0211FC70EF3002ABF16 /* Mailbox.h */,
+				BF5EC0221FC73F02002ABF16 /* WorkingVideo01.cxx */,
 			);
 			name = Source;
 			sourceTree = "<group>";

@@ -423,7 +423,7 @@ void DrawScreen(TDisplay& Display,int Tick)
  */
 
 
-uint8_t gTileBin[8192*4]  __attribute__ ((aligned(16)));
+uint8_t gTileBin[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)]  __attribute__ ((aligned(16)));
 uint8_t gTileState[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
 //static volatile uint32_t* TileBin = (uint32_t*)0x00400000;
 //static volatile uint8_t* TileState = (uint8_t*)00500000;
@@ -513,7 +513,7 @@ CAPI int notmain ( void )
 		
 		auto ChunkCount = Memory.GetSize() / ChunkSize;
 		
-		ChunkCount=1;
+		ChunkCount=3;
 		
 		char HexByteString[4];
 		auto GetHexByteString = [&](uint8_t Byte)
@@ -563,10 +563,10 @@ CAPI int notmain ( void )
 	
 	
 #else
-	TALLOCMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)*BIN_PAD_SCALAR, !USE_BIG_ALLOCATION );
+	TALLOCMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin), !USE_BIG_ALLOCATION );
 	DebugAlloc( TileBins, "Tile Bins" );
 
-	TALLOCMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE*BIN_PAD_SCALAR, !USE_BIG_ALLOCATION );
+	TALLOCMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE, !USE_BIG_ALLOCATION );
 	DebugAlloc( TileState, "Tile State" );
 	
 	TALLOCMemory Program0( 4096, !USE_BIG_ALLOCATION );
@@ -600,10 +600,9 @@ CAPI int notmain ( void )
 		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Tick ");
 		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
 		
-		Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
+		//Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
+		Display.mClearColour = RGBA( 255, 255, 255, 255 );
 	
-		DebugMemoryDump( TileBins, "Tile bins init", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
-		DebugMemoryDump( TileState, "Tile State init", Display, TILE_STRUCT_SIZE );
 
 		if ( !Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem ) )
 		{

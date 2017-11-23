@@ -13,7 +13,7 @@
 
 
 
-typedef uint32_t TTileBin;
+typedef uint8_t TTileBin;
 
 
 enum class TGpuMemFlags : uint32_t
