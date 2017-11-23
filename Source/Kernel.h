@@ -78,6 +78,8 @@ public:
 	template<typename T> static uint32_t	GetCpuAddress32(T* Addr)	{	return (uint32_t)GetCpuAddress(Addr);	}
 	template<typename T> static uint32_t	GetGpuAddress32(T* Addr)	{	return (uint32_t)GetGpuAddress(Addr);	}
 	
+	static void		Sleep(uint32_t Milliseconds);
+	
 public:
 	static uint32_t	mCpuMemoryBase;
 	static uint32_t	mCpuMemorySize;

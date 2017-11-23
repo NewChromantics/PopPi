@@ -1,6 +1,7 @@
 #include "Blitter.h"
 #include "Sprites.h"
 
+#define TEST_PAD	100
 
 
 TBlitter::TBlitter(std::function<TCanvas<TPixel>()> LockCanvas) :
@@ -82,14 +83,9 @@ void TBlitter::DrawChar(int x,int y,int Char,int& Width)
 	mConsolePos.x = x + Width;
 }
 
-#define TEST_PAD	100
 
 void TBlitter::DrawNumber(int x,int y,uint32_t Number)
 {
-#if !defined(ENABLE_DRAWING)
-	return;
-#endif
-	
 	int DigitsReversed[20+TEST_PAD];
 	DigitsReversed[0] = 0;
 	int DigitCount = 0;

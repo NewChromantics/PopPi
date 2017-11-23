@@ -2,6 +2,7 @@
 #include "Sprites.h"
 #include "Blitter.h"
 #include "Display.h"
+#include "Mailbox.h"
 
 
 uint32_t TKernel::mCpuMemoryBase = 0xbad0bad1;
@@ -9,7 +10,18 @@ uint32_t TKernel::mCpuMemorySize = 0xbad2bad3;
 uint32_t TKernel::mGpuMemoryBase = 0xbad4bad5;
 uint32_t TKernel::mGpuMemorySize = 0xbad6bad7;
 
-#define ENABLE_DRAWING
+void TKernel::Sleep(uint32_t Ms)
+{
+	//	random number, tis loop is basicaly "sleep for x ticks" so 250/1000mhz of nops is what we need?
+	Ms *= 1 * 250 * 100;
+	while ( Ms > 0 )
+	{
+		Ms--;
+		asm ("nop");
+	}
+}
+
+
 
 #define CHECKERBOARD_SIZE		16
 #define CHECKERBOARD_COLOURA	RGBA( 247,191,9,255 )
@@ -143,68 +155,6 @@ uint32_t ReadV3dReg(int Register)
 #define SIMPLE_SECTION
 
 
-
-void addbyte(uint8_t **list, uint8_t d) {
-	*((*list)++) = d;
-}
-/*
-void addshort(uint8_t **list, uint16_t d) {
-	*((*list)++) = (d >> 8) & 0xff;
-	*((*list)++) = (d)  & 0xff;
-}
-
-void addword(uint8_t **list, uint32_t d) {
-	*((*list)++) = (d >> 24) & 0xff;
-	*((*list)++) = (d >> 16)  & 0xff;
-	*((*list)++) = (d >> 8) & 0xff;
-	*((*list)++) = (d >> 0) & 0xff;
-}
-*/
-void addshort(uint8_t **list, uint16_t d) {
-	*((*list)++) = (d) & 0xff;
-	*((*list)++) = (d >> 8)  & 0xff;
-}
-
-void addword(uint8_t **list, uint32_t d) {
-	*((*list)++) = (d) & 0xff;
-	*((*list)++) = (d >> 8)  & 0xff;
-	*((*list)++) = (d >> 16) & 0xff;
-	*((*list)++) = (d >> 24) & 0xff;
-}
-
-void addfloat(uint8_t **list, float f) {
-	uint32_t d = *((uint32_t *)&f);
-	*((*list)++) = (d) & 0xff;
-	*((*list)++) = (d >> 8)  & 0xff;
-	*((*list)++) = (d >> 16) & 0xff;
-	*((*list)++) = (d >> 24) & 0xff;
-}
-
-
-uint16_t EndianSwap16(uint16_t v)
-{
-	uint16_t x = 0;
-	uint8_t* p = reinterpret_cast<uint8_t*>( &x );
-	addshort( &p, v );
-	return x;
-}
-
-uint32_t EndianSwap32(uint32_t v)
-{
-	uint32_t x = 0;
-	uint8_t* p = reinterpret_cast<uint8_t*>( &x );
-	addword( &p, v );
-	return x;
-}
-
-uint32_t EndianSwapFloat(float v)
-{
-	uint32_t x = 0;
-	uint8_t* p = reinterpret_cast<uint8_t*>( &x );
-	addfloat( &p, v );
-	return x;
-}
-
 unsigned int nextfree;
 
 unsigned int next_coarse_offset ( unsigned int x )
@@ -217,181 +167,12 @@ unsigned int next_coarse_offset ( unsigned int x )
 	return(x);
 }
 
-//	https://www.raspberrypi.org/forums/viewtopic.php?f=72&t=67970
-typedef struct
-{
-	unsigned int read;		//	0
-	unsigned int unused1;
-	unsigned int unused2;
-	unsigned int unused3;
-	unsigned int poll;		//	16
-	unsigned int sender;	//	20
-	unsigned int status;	//	24
-	unsigned int configuration;	//	28
-	unsigned int write;		//	32
-} Mailbox;
-
-static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
-
-
-enum class TGpuThread : uint32_t;
 
 void DrawScreen(TDisplay& Display,int Tick);
 
 
 
 
-
-
-namespace TMailbox
-{
-	enum class TChannel	: uint32_t;
-	enum class TTag		: uint32_t;
-	
-	//	returns amount of data returned
-	template<size_t PAYLOADSIZE>
-	int			SetProperty(TTag Tag,TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool Read=true);
-}
-
-
-
-//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-enum class TMailbox::TChannel : uint32_t
-{
-	One		= 1,
-	Gpu		= 8	//	Arm communicating with video controller (ArmToVc)
-};
-	
-enum class TMailbox::TTag : uint32_t
-{
-	GetCpuBaseAddress	= 0x00010005,	//	arm
-	GetGpuBaseAddress	= 0x00010006,	//	videocore
-
-	AllocGpuMemory	= 0x3000c,
-	FreeGpuMemory	= 0x3000f,
-	LockGpuMemory	= 0x3000d,
-	UnlockGpuMemory	= 0x3000e,
-	
-	SetResolution	= 0x00048003,
-
-	SetClockRate	= 0x00038002
-};
-		
-
-
-//	some more references for magic nmbers
-//	https://www.raspberrypi.org/forums/viewtopic.php?f=29&t=65596
-//	http://magicsmoke.co.za/?p=284
-#define MAILBOX_STATUS_BUSY		0x80000000
-#define MAILBOX_STATUS_EMPTY	0x40000000
-
-
-void MailboxWrite(volatile void* Data,TMailbox::TChannel Channel)
-{
-	Data = TKernel::GetGpuAddress( Data );
-	uint32_t BufferAddress = (uint32_t)Data;
-	
-	auto ChannelBitMask = (1<<4)-1;
-	if ( BufferAddress & ChannelBitMask )
-	{
-		//	throw
-		BufferAddress &= ~ChannelBitMask;
-	}
-
-	
-	//	and bit 1 to say... we're writing it? or because it's the channel?..
-	//	odd that it'll overwrite the display widht, but maybe that has to be aligned or something anyway
-	//	4bits per channel
-	//	gr: could be AllocateBuffer command; http://magicsmoke.co.za/?p=284
-	//	gr: why arent we setting all these tags? http://magicsmoke.co.za/?p=284
-	BufferAddress |= static_cast<uint32_t>(Channel);
-
-    while(1)
-    {
-		unsigned int mailbox = 0x2000B880;
-		//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-		//	0x80000000: request successful
-		//	0x80000001: error parsing request buffer (partial response)
-		uint32_t MailboxResponse = GET32(mailbox+24);
-		//uint32_t MailboxResponse = MAILBOX0->sender;
-		//uint32_t MailboxResponse = GET32( (uint32_t)&MAILBOX0->sender );
-		
-		//	break when we... have NO response waiting??
-		bool StatusBusy = bool_cast(MailboxResponse & MAILBOX_STATUS_BUSY);
-		if( !StatusBusy )
-			break;
-    }
-	
-	//	gr: where is
-	
-	//	gr: I bet this is configuration
-	MAILBOX0->write = BufferAddress;
-}
-
-uint32_t MailboxRead(TMailbox::TChannel Channel)
-{
-	auto ChannelBitMask = (1<<4)-1;
-    unsigned int mailbox = 0x2000B880;
-    while(1)
-    {
-        while(1)
-        {
-			//	gr: sender, not status, suggests this struct may be off...
-			//uint32_t MailboxResponse = GET32( (uint32_t)&MAILBOX0->sender );
-			uint32_t MailboxResponse = GET32( mailbox+24 );
-			bool StatusEmpty = bool_cast(MailboxResponse & MAILBOX_STATUS_EMPTY);
-            if ( !StatusEmpty )
-				break;
-        }
-
-		//	gr: switching this to MAILBOX0->read doesn't work :/
-		auto Response = GET32( mailbox+0 );
-		//auto Response = GET32( (uint32_t)&MAILBOX0->read );
-		auto ResponseChannel = static_cast<TMailbox::TChannel>( Response & ChannelBitMask );
-        if ( ResponseChannel == Channel )
-		{
-			Response &= ~ChannelBitMask;
-			return Response;
-		}
-    }
-	
-	//	throw
-	return -1;
-}
-
-bool MailboxEnableQpu(bool Enable=true)
-{
-	uint32_t Data[7] __attribute__ ((aligned(16)));
-	static_assert( sizeof(Data) == 4*7, "sizeof");
-	
-	//	header
-	Data[0] = sizeof(Data);
-	Data[1] = 0x00000000;	//	process request (0 = writing mailbox)
-	Data[2] = 0x00030012;	//	the tag id
-	Data[3] = 4;			//	size of the buffer
-	Data[4] = 4;			//	size of the data
-	
-	//	buffer here
-	Data[5] = Enable ? 1 : 0;
-	
-	//	footer
-	Data[6] = 0x00000000;	// end tag
-	
-	//	gr: channel 1 doesn't boot properly (screen resets?)
-	//	https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-	//	8 is supposed to be ARM to VC
-	auto Channel = TMailbox::TChannel::Gpu;
-	MailboxWrite( Data, Channel );
-	//	wait for it to finish
-	MailboxRead( Channel );
-	
-	//mbox_property(file_desc, p);
-	//return p[5];
-	auto Enabled = (Data[5] == 1);
-	return Enabled;
-}
-
-	
 TCanvas<uint32_t> TDisplay::LockCanvas()
 {
 	TCanvas<uint32_t> Canvas( nullptr );
@@ -611,16 +392,6 @@ struct TDisplayInfo
 
 TDisplayInfo DisplayInfo;
 
-void Sleep(int Ms)
-{
-	//	random number, tis loop is basicaly "sleep for x ticks" so 250/1000mhz of nops is what we need?
-	Ms *= 1 * 250 * 100;
-	while ( Ms > 0 )
-	{
-		Ms--;
-		asm ("nop");
-	}
-}
 
 
 TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
@@ -651,9 +422,9 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	
 	//	send this data at this address to mailbox
 	auto Channel = TMailbox::TChannel::One;
-	MailboxWrite( &DisplayInfo,Channel);
+	TMailbox::Write( &DisplayInfo,Channel);
 	//	? block until ready
-	MailboxRead( Channel );
+	TMailbox::Read( Channel );
 
 	//	read new contents of struct
 	mScreenBuffer = TKernel::GetCpuAddress( DisplayInfo.mPixelBuffer );
@@ -667,18 +438,18 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 
 	if ( EnableGpu )
 	{
-		Sleep(100);
+		TKernel::Sleep(100);
 	
 	
 		SetupGpu();
 	
-		Sleep(100);
+		TKernel::Sleep(100);
 		
 		//	gr: without this... error... not sure why this affects things
 		//	see if we have control again or if setup is stuck
 		//DrawScreen( *this, 100 );
 		
-		Sleep(100);
+		TKernel::Sleep(100);
 	}
 	
 	//	all from kernel.asm
@@ -810,7 +581,7 @@ void TDisplay::SetupGpu()
 	}
 	
 	
-	MailboxEnableQpu(true);
+	TMailbox::EnableQpu(true);
 	
 	auto Magic = ReadV3dReg(V3D_IDENT0);
 	if ( Magic != V3D_IDENT0_MAGICNUMBER )
@@ -1534,67 +1305,6 @@ void DrawScreen(TDisplay& Display,int Tick)
  */
 
 	
-volatile uint32_t MailboxBuffer[1000*1000] __attribute__ ((aligned(16)));
-int MailboxBufferPos = 1;
-volatile uint32_t* AllocMailboxBuffer(int Size)
-{
-	//	align to 16 bytes
-	int Align = 16/sizeof(uint32_t);
-	if ( MailboxBufferPos % Align != 0 )
-	{
-		MailboxBufferPos += Align - (MailboxBufferPos % Align);
-	}
-	auto* Address = &MailboxBuffer[MailboxBufferPos];
-	MailboxBufferPos += Size;
-	return Address;
-}
-
-//	returns number of elements returned
-template<size_t PAYLOADSIZE>
-int TMailbox::SetProperty(TMailbox::TTag Tag,TMailbox::TChannel Channel,uint32_t (& Payload)[PAYLOADSIZE],bool ReadData)
-{
-	auto Tag32 = static_cast<uint32_t>( Tag );
-	auto Size = PAYLOADSIZE + 6;
-	//volatile static uint32_t Data[PAYLOADSIZE + 6] __attribute__ ((aligned(16)));
-	auto* Data = AllocMailboxBuffer(Size+10);
-	
-	Data[0] = Size * sizeof(uint32_t);
-	Data[1] = 0x00000000;	// process request
-	
-	Data[2] = Tag32;
-	Data[3] = PAYLOADSIZE * sizeof(uint32_t);	//	size of buffer
-	//Data[4] = PAYLOADSIZE * sizeof(uint32_t);	//	size of data returned. needs to be 0 to send
-	Data[4] = 0;	//	size of data returned. needs to be 0 to send
-	for ( unsigned i=0;	i<PAYLOADSIZE;	i++ )
-	{
-		Data[5+i] = Payload[i];
-	}
-	Data[5+PAYLOADSIZE] = 0;	//	end tag
-	
-	//	set data
-	MailboxWrite( Data, Channel );
-	
-	if ( !ReadData )
-		return 0;
-	
-	MailboxRead( Channel );
-	
-	auto ReturnedTag = Data[2];
-	if ( ReturnedTag != static_cast<uint32_t>( Tag ) )
-		return -1;
-	
-#define BIT_RESPONSE_VALID	(1<<31)
-	auto ReturnedDataSize = Data[4] & ~BIT_RESPONSE_VALID;
-	
-	//	read back and return
-	for ( unsigned i=0;	i<PAYLOADSIZE;	i++ )
-	{
-		Payload[i] = Data[5+i];
-	}
-
-	return ReturnedDataSize / sizeof(uint32_t);
-}
-
 
 TGpuMemory::TGpuMemory(uint32_t Size,bool Lock) :
 	mHandle			( 0 ),
@@ -1680,7 +1390,8 @@ CAPI int notmain ( void )
 	TDisplay Display( 512, 512, true );
 	
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Hello world!");
-	
+	Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), 123456 );
+
 	//	gr: alphabet test seems okay
 	/*
 	char Alphabet[] = "abdefghijklmnopqrstuvwxyz0123456789():,.*!";
@@ -1691,9 +1402,6 @@ CAPI int notmain ( void )
 		Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), String );
 	}
 	*/
-	
-	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "MailboxBufferPos" );
-	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), MailboxBufferPos );
 	
 
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Cpu base address: ");
@@ -1724,7 +1432,7 @@ CAPI int notmain ( void )
 	};
 	
 	
-	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)*1000, true );
+	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin), true );
 	DebugAlloc( TileBins, "Tile Bins" );
 /*
 	if ( !TileBins.Unlock() )
@@ -1733,7 +1441,7 @@ CAPI int notmain ( void )
 	//	gr: something around here messes with the const strings
 	//		moving code around does it
 	
-	int StateSize = MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE*1000;
+	int StateSize = MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE;
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Allocating tile state bytes: " );
 	Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), StateSize );
 	
@@ -1755,6 +1463,7 @@ CAPI int notmain ( void )
 	TGpuMemory Program4( 4096, true );
 	DebugAlloc( Program4, "Program4" );
 
+	return 0;
 	
 	uint32_t Tick = 0;
 	while ( true )
@@ -1767,7 +1476,7 @@ CAPI int notmain ( void )
 		if ( !Display.SetupBinControl( Program0.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()), TileBins.GetSize(), TileState.GetGpuAddress() ) )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
-			Sleep(10);
+			TKernel::Sleep(10);
 		}
 		else
 		{
@@ -1778,7 +1487,7 @@ CAPI int notmain ( void )
 		if ( !Display.SetupRenderControl( Program1.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()) ) )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
-			Sleep(10);
+			TKernel::Sleep(10);
 		}
 		else
 		{
@@ -1786,7 +1495,7 @@ CAPI int notmain ( void )
 		}
 		
 		Tick++;
-		Sleep(100);
+		TKernel::Sleep(100);
 	}
 
 
