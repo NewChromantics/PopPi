@@ -15,6 +15,13 @@ uint32_t TKernel::mGpuMemorySize = 0xbad6bad7;
 // = RGBA( 56,185,255,255 );
 //Colours[1] = RGBA( 199,214,221,255 );
 
+//	gr: if I don't stop thread 0, it hangs after 22 iterations
+//#define RESET_THREAD0
+#define STOP_THREAD0
+#define RESET_THREAD1
+//#define STOP_THREAD1
+#define RESET_THREAD_ON_ERROR
+
 //-------------------------------------------------------------------------
 //-------------------------------------------------------------------------
 
@@ -103,7 +110,7 @@ extern "C"
 //#define V3D_BASE_ADDRESS	(0x3F000000 | 0xc00000)	//	pi2
 
 
-typedef uint8_t TTileBin;
+typedef uint32_t TTileBin;
 
 volatile uint32_t* GetV3dReg(int Register)
 {
@@ -1361,8 +1368,8 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, MaxIndex);
 #endif
 	//	Flush
-	//addbyte(&p, 0x4);	//	flush
-	addbyte(&p, 0x5);	//	flush all state
+	addbyte(&p, 0x4);	//	flush
+	//addbyte(&p, 0x5);	//	flush all state
 	addbyte(&p, 1);	//	nop
 	addbyte(&p, 0);	//	halt
 
@@ -1371,20 +1378,23 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	
 	auto* ProgramMemoryEnd = p;
 	
-	/*
-	//	reset thread...
-	auto Status = *GetV3dReg(V3D_CT0CS);
-	Status |= 1<<15;
-	*GetV3dReg(V3D_CT0CS) = Status;
-	*/
-	/*
-	//	stop thread...
-	auto Status = *GetV3dReg(V3D_CT0CS);
-	Status &= ~(1<<5);
-	*GetV3dReg(V3D_CT0CS) = Status;
-	*/
+#if defined(RESET_THREAD0)
+	{
+		//	reset thread...
+		auto Status = *GetV3dReg(V3D_CT0CS);
+		Status |= 1<<15;
+		*GetV3dReg(V3D_CT0CS) = Status;
+	}
+#endif
 	
-	auto InitialFlushCount = ReadV3dReg(V3D_BFC);
+#if defined(STOP_THREAD0)
+	{
+		//	stop thread...
+		auto Status = *GetV3dReg(V3D_CT0CS);
+		Status |= (1<<5);
+		*GetV3dReg(V3D_CT0CS) = Status;
+	}
+#endif
 
 	if ( !WaitForThread(0) )
 		return false;
@@ -1512,14 +1522,51 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 	
 	auto Length = (int)ProgramMemoryEnd - (int)ProgramMemory;
 	if ( Length == 0 )
+	{
+		DrawString( GetConsoleX(), GetConsoleY(), "thread 1 program length zero" );
 		return false;
-
-	//	explicit stop
-	//*GetV3dReg(V3D_CT1CS) = 0x20;
+	}
 	
+#if defined(RESET_THREAD1)
+	{
+		//	reset thread...
+		auto Status = *GetV3dReg(V3D_CT1CS);
+		Status |= 1<<15;
+		*GetV3dReg(V3D_CT1CS) = Status;
+	}
+#endif
+	
+#if defined(STOP_THREAD1)
+	{
+		//	stop thread...
+		auto Status = *GetV3dReg(V3D_CT1CS);
+		Status |= (1<<5);
+		*GetV3dReg(V3D_CT1CS) = Status;
+	}
+#endif
 	auto Thread = 1;
+	
+	
 	if ( !WaitForThread(Thread) )
+	{
+		//	gr: none of these resets are getting rid of the error
+		DrawString( GetConsoleX(), GetConsoleY(), "thread 1 pre wait failed" );
+#if defined(RESET_THREAD_ON_ERROR)
+		//	reset thread...
+		auto Status = *GetV3dReg(V3D_CT1CS);
+		Status = 1<<15;
+		*GetV3dReg(V3D_CT1CS) = Status;
+#endif
+		/*
+		{
+			//	stop thread...
+			auto Status = *GetV3dReg(V3D_CT1CS);
+			Status |= (1<<5);
+			*GetV3dReg(V3D_CT1CS) = Status;
+		}
 		return false;
+		 */
+	}
 	
 	
 	*GetV3dReg(V3D_CT1CA) = TKernel::GetGpuAddress32(ProgramMemory);
@@ -1534,6 +1581,13 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 			
 			DrawString( GetConsoleX(), GetConsoleY(), "Thread1 Error=" );
 			DrawHex( GetConsoleX(false), GetConsoleY(), ErrorStat );
+			
+#if defined(RESET_THREAD_ON_ERROR)
+			//	reset thread...
+			auto Status = *GetV3dReg(V3D_CT1CS);
+			Status |= 1<<15;
+			*GetV3dReg(V3D_CT1CS) = Status;
+#endif
 			return false;
 		}
 		
@@ -1891,7 +1945,7 @@ CAPI int notmain ( void )
 	//TDisplay Display( 1920, 1080, true );
 	TDisplay Display( 512, 512, true );
 	
-	Display.DrawString( 1, 1, "Hello world!");
+	Display.DrawString( 5, 5, "Hello world!");
 	
 	//	gr: alphabet test seems okay
 	/*
@@ -1936,7 +1990,7 @@ CAPI int notmain ( void )
 	};
 	
 	
-	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin) * 1024, true );
+	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)*1000, true );
 	DebugAlloc( TileBins, "Tile Bins" );
 /*
 	if ( !TileBins.Unlock() )
@@ -1945,7 +1999,7 @@ CAPI int notmain ( void )
 	//	gr: something around here messes with the const strings
 	//		moving code around does it
 	
-	int StateSize = MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE;
+	int StateSize = MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE*1000;
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Allocating tile state bytes: " );
 	Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), StateSize );
 	
@@ -1978,23 +2032,23 @@ CAPI int notmain ( void )
 		
 		if ( !Display.SetupBinControl( Program0.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()), TileBins.GetSize(), TileState.GetGpuAddress() ) )
 		{
-			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
 			Sleep(10);
 		}
 		else
 		{
-			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl success");
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl success");
 		}
 
 		//	gr this actually draws...
 		if ( !Display.SetupRenderControl( Program1.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()) ) )
 		{
-			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
 			Sleep(10);
 		}
 		else
 		{
-			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl success");
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl success");
 		}
 		
 		Tick++;
