@@ -1,5 +1,6 @@
 #include "Kernel.h"
 #include "Sprites.h"
+#include "Blitter.h"
 
 
 uint32_t TKernel::mCpuMemoryBase = 0xbad0bad1;
@@ -236,23 +237,13 @@ static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
 enum class TGpuThread : uint32_t;
 
 
-class TDisplay
+class TDisplay : public TBlitter
 {
 public:
 	TDisplay(int Width,int Height,bool EnableGpu);
 	
 	void		SetResolution(uint32_t Width,uint32_t Height);
 
-	void		SetPixel(int x,int y,uint32_t Colour);
-	void		SetPixel(int Index,uint32_t Colour);
-	void		FillRow(int y,uint32_t Colour);
-	void		FillPixels(uint32_t Colour);
-	void		FillPixelsCheckerBoard(int SquareSize,uint32_t ColourA,uint32_t ColourB);
-	
-	void		DrawNumber(int x,int y,uint32_t Number);
-	void		DrawHex(int x,int y,uint32_t Number);
-	void		DrawChar(int x,int y,int Char,int& CharWidth);
-	void		DrawString(int x,int y,const char* String);
 
 	void		SetupGpu();
 	template<typename LAMBDA>
@@ -263,17 +254,13 @@ public:
 	uint8_t*	SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory);
 	bool		SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory);
 	
-	int			GetConsoleY();
-	int			GetConsoleX(bool NewLine=true);
 
 	uint8_t		GetTileWidth() const	{	return (mWidth%64)/64;	}	//	round down so we don't overflow pixel buffer
 	uint8_t		GetTileHeight() const	{	return (mHeight%64)/64;	}	//	round down so we don't overflow pixel buffer
 
-
+	TCanvas<uint32_t>	LockCanvas();
 	
 public:
-	int			mConsoleX;
-	int			mConsoleY;
 	uint32_t	mClearColour;
 	uint32_t	mWidth;
 	uint32_t	mHeight;
@@ -483,6 +470,16 @@ bool MailboxEnableQpu(bool Enable=true)
 	return Enabled;
 }
 
+	
+TCanvas<uint32_t> TDisplay::LockCanvas()
+{
+	TCanvas<uint32_t> Canvas( nullptr );
+	Canvas.mPixels = mScreenBuffer;
+	Canvas.mWidth = mWidth;
+	Canvas.mHeight = mHeight;
+	return Canvas;
+}
+
 
 void TDisplay::SetResolution(uint32_t Width,uint32_t Height)
 {
@@ -571,10 +568,6 @@ bool mmu_section(unsigned int add,unsigned int flags)
 	}
 	return true;
 #endif
-}
-
-void exit(int Error)
-{
 }
 
 
@@ -714,8 +707,7 @@ TDisplay::TDisplay(int Width,int Height,bool EnableGpu) :
 	mWidth			( Width ),
 	mHeight			( Height ),
 	mClearColour	( RGBA( 255,0,255,255 ) ),
-	mConsoleX		( 1 ),
-	mConsoleY		( 201 )
+	TBlitter		( [this]{	return this->LockCanvas();	} )
 {
 	
 	auto ScrollX = 0;
@@ -879,31 +871,6 @@ CONTROL_LIST_BIN_END:
 
 */
 
-int TDisplay::GetConsoleY()
-{
-	return mConsoleY % (mHeight-10);
-}
-
-int TDisplay::GetConsoleX(bool NewLine)
-{
-	if ( NewLine )
-	{
-		mConsoleY += 10;
-		mConsoleX = 1;
-	}
-	
-	auto Right = mWidth - 10;
-	
-	//	wrap
-	if ( mConsoleX >= Right )
-	{
-		mConsoleX = 1;
-		mConsoleY += 10;
-	}
-	
-	return mConsoleX;
-}
-
 #define VC_INSTRUCTION_NOP	1
 #define VC_INSTRUCTION_HALT	0
 	
@@ -998,161 +965,7 @@ void TDisplay::GpuNopTest()
 	};
 	GpuExecute( Size, ProgramSetup, TGpuThread::Thread0 );
 }
-
-void TDisplay::SetPixel(int Index,uint32_t Colour)
-{
-	mScreenBuffer[Index] = Colour;
-}
-
-
-void TDisplay::SetPixel(int x,int y,uint32_t Colour)
-{
-	auto Address = x + (y*mWidth);
-	SetPixel( Address, Colour );
-}
-
-
-void TDisplay::FillRow(int y,uint32_t Colour)
-{
-	auto Start = 0 + ( y * mWidth );
-	auto End = mWidth + ( y * mWidth );
 	
-	for ( ;	Start<End;	Start++ )
-	{
-		mScreenBuffer[Start] = Colour;
-	}
-}
-
-
-	
-
-void TDisplay::DrawChar(int x,int y,int Char,int& Width)
-{
-	int Height;
-	auto* Sprite = PopSprite::GetSprite( Char, Width, Height );
-	
-	for ( int row=0;	row<Height;	row++ )
-	{
-		for ( int col=0;	col<Width;	col++ )
-		{
-			auto px = x + col;
-			auto py = y + row;
-			auto ColourIndex = Sprite[col + (row*Width)];
-			auto Colour = PopSprite::GetPaletteColour(ColourIndex);
-			if ( !Colour.IsOpaque() )
-				continue;
-			SetPixel( px,py,Colour.bgra );
-		}
-	}
-
-	mConsoleY = y;
-	mConsoleX = x + Width;
-}
-	
-#define TEST_PAD	100
-
-void TDisplay::DrawNumber(int x,int y,uint32_t Number)
-{
-#if !defined(ENABLE_DRAWING)
-	return;
-#endif
-
-	int DigitsReversed[20+TEST_PAD];
-	DigitsReversed[0] = 0;
-	int DigitCount = 0;
-	if ( Number == 0 )
-		DigitsReversed[DigitCount++] = '0';
-	while ( Number > 0 && DigitCount < 20 )
-	{
-		DigitsReversed[DigitCount++] = (Number % 10) + '0';
-		Number /= 10;
-	};
-	
-	
-	char Digits[20+TEST_PAD];
-	for ( int i=DigitCount-1;  i>=0;  i-- )
-	{
-		auto di = DigitCount - 1 - i;
-		Digits[di] = DigitsReversed[i];
-	}
-	Digits[DigitCount] = '\0';
-	DrawString( x, y, Digits );
-}
-	
-
-void TDisplay::DrawHex(int x,int y,uint32_t Number)
-{
-#if !defined(ENABLE_DRAWING)
-	return;
-#endif
-
-	char Digits[11 + TEST_PAD];
-	Digits[0] = '0';
-	Digits[1] = '*';
-	for ( int i=0;	i<8;	i++ )
-	{
-		int d = 2 + i;
-		int Shift = (7-i) * 4;
-		int h = (Number >> Shift) & 0xf;
-		if ( h >= 10 )
-			Digits[d] = (h-10) + 'a';
-		else
-			Digits[d] = (h) + '0';
-	}
-	Digits[10] = '\0';
-	DrawString( x, y, Digits );
-}
-
-void TDisplay::DrawString(int x,int y,const char* String)
-{
-#if !defined(ENABLE_DRAWING)
-	return;
-#endif
-	
-	int MaxSize = 400;
-	while ( MaxSize-- > 0 )
-	{
-		auto Char = String[0];
-		String++;
-		if ( Char == '\0' )
-			break;
-		int Width = 1;
-		DrawChar( x, y, Char, Width );
-		x += Width;
-	}
-}
-	
-void TDisplay::FillPixels(uint32_t Colour)
-{
-	for ( int y=0;	y<mHeight;	y++ )
-	{
-		FillRow(y,Colour);
-	}
-}
-	
-void TDisplay::FillPixelsCheckerBoard(int SquareSize,uint32_t ColourA,uint32_t ColourB)
-{
-	uint32_t Colours[2+TEST_PAD];
-	Colours[0] = ColourA;
-	Colours[1] = ColourB;
-	
-	auto* Pixels = mScreenBuffer;
-	for ( unsigned y=0;	y<mHeight;	y++ )
-	{
-		auto yodd = (y/SquareSize) & 1;
-		for ( unsigned x=0;	x<mWidth;	x++ )
-		{
-			auto xodd = (x/SquareSize) & 1;
-			if ( yodd )
-				xodd = !xodd;
-			auto ColourIndex = xodd;
-			int p = x + (y * mWidth);
-			Pixels[p] = Colours[ColourIndex];
-		}
-	}
-}
-
-
 #define MAX_TILE_WIDTH		40
 #define MAX_TILE_HEIGHT		40
 #define TILE_STRUCT_SIZE	48
@@ -1945,7 +1758,7 @@ CAPI int notmain ( void )
 	//TDisplay Display( 1920, 1080, true );
 	TDisplay Display( 512, 512, true );
 	
-	Display.DrawString( 5, 5, "Hello world!");
+	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Hello world!");
 	
 	//	gr: alphabet test seems okay
 	/*

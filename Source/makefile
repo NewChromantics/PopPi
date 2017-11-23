@@ -10,7 +10,7 @@ TARGET = kernel.img
 PROJECTNAME = PopPi
 
 COPS = -Wall -O2 -nostdlib -nostartfiles -ffreestanding 
-CPPOPS = -Wall -O2 -std=c++11 -nostdlib -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions
+CPPOPS = -Wall -O2 -std=c++11 -nostdlib -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions -fno-rtti
 
 LINKOPS = -L$(ARMLIBPATH) -lgcc 
 #-lfplib

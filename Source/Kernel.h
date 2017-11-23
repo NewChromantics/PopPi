@@ -1,6 +1,9 @@
 #pragma once
 
 
+#include "Types.h"
+
+
 #if defined(TARGET_CPP)
 #define CAPI	extern "C"
 extern "C"
@@ -41,24 +44,6 @@ extern "C"
 #if defined(TARGET_CPP)
 }
 #endif
-
-//	display is BGRA
-#define BGRA(r,g,b,a)		( (uint32_t(r)<<0) | (uint32_t(g)<<8) | (uint32_t(b)<<16) | (uint32_t(a)<<24) )
-#define RGBA(r,g,b,a)		( BGRA(b,g,r,a) )
-
-
-typedef unsigned char	uint8_t;
-typedef unsigned short	uint16_t;
-typedef unsigned int	uint32_t;
-typedef uint32_t		size_t;
-
-
-template<typename T>
-inline constexpr bool bool_cast(const T& v)
-{
-	return v != 0;
-}
-
 
 
 class TKernel
