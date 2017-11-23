@@ -103,6 +103,7 @@ inline void addfloat(uint8_t **list, float f)
 
 inline uint16_t EndianSwap16(uint16_t v)
 {
+	return v;
 	uint16_t x = 0;
 	uint8_t* p = reinterpret_cast<uint8_t*>( &x );
 	addshort( &p, v );
@@ -111,6 +112,7 @@ inline uint16_t EndianSwap16(uint16_t v)
 
 inline uint32_t EndianSwap32(uint32_t v)
 {
+	return v;
 	uint32_t x = 0;
 	uint8_t* p = reinterpret_cast<uint8_t*>( &x );
 	addword( &p, v );
@@ -119,6 +121,9 @@ inline uint32_t EndianSwap32(uint32_t v)
 
 inline uint32_t EndianSwapFloat(float v)
 {
+	static_assert( sizeof(float) == sizeof(uint32_t), "Expecting 32bit float");
+	uint32_t* f32 = reinterpret_cast<uint32_t*>(&v);
+	return *f32;
 	uint32_t x = 0;
 	uint8_t* p = reinterpret_cast<uint8_t*>( &x );
 	addfloat( &p, v );
