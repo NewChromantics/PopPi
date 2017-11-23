@@ -12,6 +12,13 @@
 #define RESET_THREAD_ON_ERROR
 #define STOP_THREAD_ON_ERROR
 
+#define GetTHREADAddress32			GetUnmodifiedAddress32
+#define GetSCREENBUFFERAddress32	GetBusAddress32
+#define GetTILEBINAddress32			GetUnmodifiedAddress32
+#define GetPROGRAMMEMAddress		GetUnmodifiedAddress
+
+
+#define ALLOC_ALIGNMENT				0x1000
 
 
 #define V3D_IDENT0_MAGICNUMBER	0x02443356	//	2V3D
@@ -68,7 +75,7 @@ TGpuMemory::TGpuMemory(uint32_t Size,bool Lock) :
 	mLockedAddress	( nullptr )
 {
 	//	gr: most things need to be aligned to 16 bytes
-	auto AlignBytes = 0x1000;
+	auto AlignBytes = ALLOC_ALIGNMENT;
 	//auto AlignBytes = 16;
 	auto Flags = (uint32_t)(TGpuMemFlags::Coherent | TGpuMemFlags::ZeroMemory);
 	
@@ -157,6 +164,13 @@ uint8_t* TGpuMemory::GetGpuAddress() const
 	if ( !mLockedAddress )
 		return nullptr;
 	return TKernel::GetGpuAddress(mLockedAddress);
+}
+
+uint8_t* TGpuMemory::GetBusAddress() const
+{
+	if ( !mLockedAddress )
+		return nullptr;
+	return TKernel::GetBusAddress(mLockedAddress);
 }
 
 
@@ -260,7 +274,7 @@ TDisplay::TDisplay(int Width,int Height) :
 	TMailbox::Read( Channel );
 	
 	//	read new contents of struct
-	mScreenBuffer = TKernel::GetCpuAddress( DisplayInfo.mPixelBuffer );
+	mScreenBuffer = DisplayInfo.mPixelBuffer;
 	//	todo: if addr=0, loop
 	
 	//	all from kernel.asm
@@ -437,9 +451,9 @@ void TDisplay::GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThrea
 	auto RegStatus = RegStatuss[static_cast<uint32_t>(GpuThread)];
 	
 	//	tell thread0 to start at our instructions
-	*GetV3dReg(RegStart) = TKernel::GetGpuAddress32(Memory);
+	*GetV3dReg(RegStart) = TKernel::GetTHREADAddress32(Memory);
 	//	set end address, also starts execution
-	*GetV3dReg(RegEnd) = TKernel::GetGpuAddress32(Memory) + ExecuteSize;
+	*GetV3dReg(RegEnd) = TKernel::GetTHREADAddress32(Memory) + ExecuteSize;
 	
 	
 	//	Wait a second to be sure the contorl list execution has finished
@@ -597,7 +611,7 @@ bool WaitForThread(int ThreadIndex)
 bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
 {
 	//	CONTROL_LIST_BIN_STRUCT
-	auto* p = TKernel::GetCpuAddress((uint8_t*)ProgramMemory);
+	auto* p = TKernel::GetPROGRAMMEMAddress((uint8_t*)ProgramMemory);
 	
 	//	Tile_Binning_Mode_Configuration
 	addbyte(&p, 112);
@@ -661,10 +675,10 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, MaxIndex);
 #endif
 	//	Flush
-	addbyte(&p, 0x4);	//	flush
+//	addbyte(&p, 0x4);	//	flush
 	//addbyte(&p, 0x5);	//	flush all state
-	addbyte(&p, 1);	//	nop
-	addbyte(&p, 0);	//	halt
+//	addbyte(&p, 1);	//	nop
+//	addbyte(&p, 0);	//	halt
 	
 	
 	
@@ -694,8 +708,8 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	
 
 	
-	*GetV3dReg(V3D_CT0CA) = TKernel::GetGpuAddress32(ProgramMemory);
-	*GetV3dReg(V3D_CT0EA) = TKernel::GetGpuAddress32(ProgramMemoryEnd);
+	*GetV3dReg(V3D_CT0CA) = TKernel::GetTHREADAddress32(ProgramMemory);
+	*GetV3dReg(V3D_CT0EA) = TKernel::GetTHREADAddress32(ProgramMemoryEnd);
 	
 	if ( !WaitForThread(0) )
 		return false;
@@ -729,7 +743,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 	//	Tile_Rendering_Mode_Configuration
 #define Frame_Buffer_Color_Format_RGBA8888 0x4
 	addbyte( &Program, 113 );
-	addword( &Program, TKernel::GetCpuAddress32(mScreenBuffer) );
+	addword( &Program, TKernel::GetSCREENBUFFERAddress32(mScreenBuffer) );
 	addshort( &Program, mWidth );	//	controls row stride
 	addshort( &Program, mHeight );
 	addshort( &Program, Frame_Buffer_Color_Format_RGBA8888 );
@@ -768,7 +782,7 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 			int TileIndex = tx + ( TileWidth * ty );
 			auto* Address = &TileBinMemory[ TileIndex * TILE_BIN_BLOCK_SIZE ];
 			addbyte( &Program, 17 );
-			addword( &Program, TKernel::GetGpuAddress32(Address) );
+			addword( &Program, TKernel::GetTILEBINAddress32(Address) );
 			
 			bool LastTile = (tx==TileWidth-1) && (ty==TileHeight-1);
 			if ( LastTile )
@@ -785,8 +799,8 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 	
 	addbyte(&Program, 0x5);	//	flush all state
 	
-	addbyte(&Program, 1);	//	nop
-	addbyte(&Program, 0);	//	halt
+	//addbyte(&Program, 1);	//	nop
+	//addbyte(&Program, 0);	//	halt
 	
 	return Program;
 }
@@ -851,9 +865,9 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 		 return false;
 	}
 	
-	
-	*GetV3dReg(V3D_CT1CA) = TKernel::GetGpuAddress32(ProgramMemory);
-	*GetV3dReg(V3D_CT1EA) = TKernel::GetGpuAddress32(ProgramMemoryEnd);
+
+	*GetV3dReg(V3D_CT1CA) = TKernel::GetTHREADAddress32(ProgramMemory);
+	*GetV3dReg(V3D_CT1EA) = TKernel::GetTHREADAddress32(ProgramMemoryEnd);
 	
 	while ( true )
 	{
@@ -894,5 +908,82 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 }
 
 
+
+
+
+
+
+//	10mb causes trash startup...
+uint8_t gCpuMemoryBlock[1024*1024]__attribute__ ((aligned(16)));
+//uint8_t gCpuMemoryBlock[ 1024 * 1024 * 10]__attribute__ ((aligned(16)));
+int gCpuMemoryBlockAllocated = 1;
+int gCpuMemoryBlockHandleNext = 1;
+
+
+TCpuMemory::TCpuMemory(uint32_t Size,bool Lock) :
+	mHandle			( gCpuMemoryBlockHandleNext++ ),
+	mSize			( Size ),
+	mLockedAddress	( nullptr )
+{
+	//	alloc
+	auto Align = ALLOC_ALIGNMENT;
+	uint32_t NewAddress = (uint32_t)&gCpuMemoryBlock[ gCpuMemoryBlockAllocated ];
+	
+	//	align
+	NewAddress += Align-1;
+	NewAddress -= NewAddress % Align;
+	
+	mLockedAddress = (uint8_t*)NewAddress;
+	
+	//	count bytes eaten
+	auto Eaten = mSize + NewAddress - (uint32_t)gCpuMemoryBlock;
+	gCpuMemoryBlockAllocated = Eaten;
+	
+	Clear(0);
+}
+
+void TCpuMemory::Clear(uint8_t Value)
+{
+	for ( int i=0;	i<mSize;	i++ )
+		mLockedAddress[i] = Value;
+}
+
+
+void TCpuMemory::Free()
+{
+	mLockedAddress = nullptr;
+	mHandle = 0;
+}
+
+uint8_t* TCpuMemory::Lock()
+{
+	return mLockedAddress;
+}
+
+bool TCpuMemory::Unlock()
+{
+	return true;
+}
+
+uint8_t* TCpuMemory::GetCpuAddress() const
+{
+	if ( !mLockedAddress )
+		return nullptr;
+	return TKernel::GetCpuAddress(mLockedAddress);
+}
+
+uint8_t* TCpuMemory::GetGpuAddress() const
+{
+	if ( !mLockedAddress )
+		return nullptr;
+	return TKernel::GetGpuAddress(mLockedAddress);
+}
+
+uint8_t* TCpuMemory::GetBusAddress() const
+{
+	if ( !mLockedAddress )
+		return nullptr;
+	return TKernel::GetBusAddress(mLockedAddress);
+}
 
 

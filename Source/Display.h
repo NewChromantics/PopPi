@@ -55,7 +55,8 @@ class TGpuMemory
 	size_t		GetSize() const				{	return mSize;	}
 	uint8_t*	GetCpuAddress() const;
 	uint8_t*	GetGpuAddress() const;
-	uint8_t*	GetAllocatedAddress() const	{	return mLockedAddress;	}
+	uint8_t*	GetBusAddress() const;
+	uint8_t*	GetAllocAddress() const	{	return mLockedAddress;	}
 	
 	uint8_t*	Lock();
 	bool		Unlock();
@@ -66,6 +67,32 @@ class TGpuMemory
 	uint8_t*	mLockedAddress;
 };
 
+
+
+class TCpuMemory
+{
+public:
+	TCpuMemory(uint32_t Size,bool Lock);
+	
+	void		Clear(uint8_t Value);
+	
+	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
+	void 		Free();
+	
+	size_t		GetSize() const				{	return mSize;	}
+	uint8_t*	GetCpuAddress() const;
+	uint8_t*	GetGpuAddress() const;
+	uint8_t*	GetBusAddress() const;
+	uint8_t*	GetAllocAddress() const	{	return mLockedAddress;	}
+	
+	uint8_t*	Lock();
+	bool		Unlock();
+	
+	public:
+	uint32_t	mHandle;
+	size_t		mSize;
+	uint8_t*	mLockedAddress;
+};
 
 
 class TDisplay : public TBlitter

@@ -51,6 +51,19 @@ class TKernel
 public:
 	TKernel();
 	
+
+	//#define CPU_START_ADDRESS	0x40000000
+	#define CPU_START_ADDRESS	0x00000000
+#define GPU_START_ADDRESS	0x80000000
+//#define GPU_START_ADDRESS	0x08000000
+#define BUS_MASK_ADDRESS	0x3fffffff
+	
+	template<typename T>
+	static T*	GetUnmodifiedAddress(T* Addr)
+	{
+		return Addr;
+	}
+
 	
 	template<typename T>
 	static T*	GetGpuAddress(T* Addr)
@@ -63,7 +76,8 @@ public:
 		//BufferAddress |= 0xC0000000;
 		
 		auto Addr32 = (uint32_t)Addr;
-		Addr32 |= 0x40000000;
+		Addr32 &= BUS_MASK_ADDRESS;
+		Addr32 |= GPU_START_ADDRESS;
 		return (T*)Addr32;
 	}
 	
@@ -71,12 +85,23 @@ public:
 	static T*	GetCpuAddress(T* Addr)
 	{
 		auto Addr32 = (uint32_t)Addr;
-		Addr32 &= 0x3FFFFFFF;
+		Addr32 &= BUS_MASK_ADDRESS;
+		Addr32 |= CPU_START_ADDRESS;
+		return (T*)Addr32;
+	}
+	
+	template<typename T>
+	static T*	GetBusAddress(T* Addr)
+	{
+		auto Addr32 = (uint32_t)Addr;
+		Addr32 &= BUS_MASK_ADDRESS;
 		return (T*)Addr32;
 	}
 	
 	template<typename T> static uint32_t	GetCpuAddress32(T* Addr)	{	return (uint32_t)GetCpuAddress(Addr);	}
 	template<typename T> static uint32_t	GetGpuAddress32(T* Addr)	{	return (uint32_t)GetGpuAddress(Addr);	}
+	template<typename T> static uint32_t	GetBusAddress32(T* Addr)	{	return (uint32_t)GetBusAddress(Addr);	}
+	template<typename T> static uint32_t	GetUnmodifiedAddress32(T* Addr)	{	return (uint32_t)GetUnmodifiedAddress(Addr);	}
 	
 	static void		Sleep(uint32_t Milliseconds);
 	
