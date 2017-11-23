@@ -5,8 +5,15 @@
 
 
 
+#define MAX_TILE_WIDTH		40
+#define MAX_TILE_HEIGHT		40
+#define TILE_STRUCT_SIZE	48
 
-typedef uint32_t TTileBin;
+#define TILE_BIN_BLOCK_SIZE	(32)	//	gr; if not 32, there's flags for 64,128,256
+
+
+
+typedef uint8_t TTileBin;
 
 
 enum class TGpuMemFlags : uint32_t
@@ -62,7 +69,7 @@ class TGpuMemory
 class TDisplay : public TBlitter
 {
 public:
-	TDisplay(int Width,int Height,bool EnableGpu);
+	TDisplay(int Width,int Height);
 	
 	void		SetResolution(uint32_t Width,uint32_t Height);
 

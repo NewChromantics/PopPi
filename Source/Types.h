@@ -17,6 +17,15 @@ inline constexpr bool bool_cast(const T& v)
 	return v != 0;
 }
 
+namespace  Math
+{
+	template<typename T>
+	T	Min(T a,T b)		{	return (a<b) ? a : b;	}
+	
+	template<typename T>
+	T	Max(T a,T b)		{	return (a>b) ? a : b;	}
+}
+
 
 template<typename TYPE>
 struct TVector2
