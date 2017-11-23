@@ -1,6 +1,7 @@
 #include "Kernel.h"
 #include "Sprites.h"
 #include "Blitter.h"
+#include "Display.h"
 
 
 uint32_t TKernel::mCpuMemoryBase = 0xbad0bad1;
@@ -111,7 +112,6 @@ extern "C"
 //#define V3D_BASE_ADDRESS	(0x3F000000 | 0xc00000)	//	pi2
 
 
-typedef uint32_t TTileBin;
 
 volatile uint32_t* GetV3dReg(int Register)
 {
@@ -236,89 +236,10 @@ static volatile Mailbox* const MAILBOX0 = (Mailbox*)0x2000b880;
 
 enum class TGpuThread : uint32_t;
 
-
-class TDisplay : public TBlitter
-{
-public:
-	TDisplay(int Width,int Height,bool EnableGpu);
-	
-	void		SetResolution(uint32_t Width,uint32_t Height);
-
-
-	void		SetupGpu();
-	template<typename LAMBDA>
-	void		GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread);
-	void		GpuNopTest();
-	
-	bool		SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory);
-	uint8_t*	SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory);
-	bool		SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory);
-	
-
-	uint8_t		GetTileWidth() const	{	return (mWidth%64)/64;	}	//	round down so we don't overflow pixel buffer
-	uint8_t		GetTileHeight() const	{	return (mHeight%64)/64;	}	//	round down so we don't overflow pixel buffer
-
-	TCanvas<uint32_t>	LockCanvas();
-	
-public:
-	uint32_t	mClearColour;
-	uint32_t	mWidth;
-	uint32_t	mHeight;
-	uint32_t*	mScreenBuffer;
-};
-
 void DrawScreen(TDisplay& Display,int Tick);
 
 
-class TGpuMemory;
 
-
-
-class TGpuMemory
-{
-public:
-	TGpuMemory(uint32_t Size,bool Lock);
-	
-	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
-	void 		Free();
-
-	size_t		GetSize() const				{	return mSize;	}
-	uint8_t*	GetCpuAddress() const		{	return TKernel::GetCpuAddress(mLockedAddress);	}
-	uint8_t*	GetGpuAddress() const		{	return TKernel::GetGpuAddress(mLockedAddress);	}
-	uint8_t*	GetAllocatedAddress() const	{	return mLockedAddress;	}
-	
-	uint8_t*	Lock();
-	bool		Unlock();
-	
-public:
-	uint32_t	mHandle;
-	size_t		mSize;
-	uint8_t*	mLockedAddress;
-};
-
-
-enum class TGpuMemFlags : uint32_t
-{
-	Discardable		= 1<<0,	//	can be resized to 0 at any time. Use for cached data
-	Normal			= 0,	//	normal allocating alias. Don't use from ARM
-	Direct			= 1<<2,	//	0xC alias uncached
-	Coherent		= 1<<3,	//	same as 2<<2	0x8 alias. Non-allocating in L2 but coherent
-	L1NonAllocating	= Direct | Coherent,	//	Allocating in L2
-	ZeroMemory		= 1<<4,	//	initialise all zero
-	NoInit			= 1<<5,	//	don't initialise (default is initialise to all ones)
-	HintPermalock	= 1<<6,	//	Likely to be locked for long periods of time
-};
-
-constexpr enum TGpuMemFlags operator |(const enum TGpuMemFlags selfValue,const enum TGpuMemFlags inValue)
-{
-	return (enum TGpuMemFlags)(uint32_t(selfValue) | uint32_t(inValue));
-}
-
-enum class TGpuThread : uint32_t
-{
-	Thread0		= 0,
-	Thread1		= 1,
-};
 
 
 
