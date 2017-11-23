@@ -481,24 +481,31 @@ CAPI int notmain ( void )
 	
 	auto DebugMemoryDump = [](TGpuMemory& Memory,const char* Name,TBlitter& Blitter,int ChunkSize)
 	{
-		auto* Mem = Memory.GetCpuAddress();
+		auto* Mem = Memory.GetGpuAddress();
 		
 		Blitter.DrawString( Blitter.GetConsoleX(), Blitter.GetConsoleY(), "Memory dump of ");
 		Blitter.DrawString( Blitter.GetConsoleX(false), Blitter.GetConsoleY(), Name );
 
+		if ( !Mem )
+		{
+			Blitter.DrawString( Blitter.GetConsoleX(), Blitter.GetConsoleY(), "(null)" );
+			return;
+		}
+		
 		auto ChunkCount = Memory.GetSize() / ChunkSize;
 		
-		ChunkCount=3;
+		ChunkCount=1;
 		
 		char HexByteString[4];
 		auto GetHexByteString = [&](uint8_t Byte)
 		{
-			int a = (Byte>>4) & 0xf;
-			int b = (Byte>>0) & 0xf;
+			uint8_t a = (Byte>>4) & 0x0f;
+			uint8_t b = (Byte>>0) & 0x0f;
 	
 			HexByteString[0] = ( a >= 10 ) ? ((a-10) + 'a') : a + '0';
 			HexByteString[1] = ( b >= 10 ) ? ((b-10) + 'a') : b + '0';
 			HexByteString[2] = ' ';
+			HexByteString[3] = '\0';
 			
 			return HexByteString;
 		};
@@ -513,34 +520,61 @@ CAPI int notmain ( void )
 			{
 				auto* String = GetHexByteString( Addr[i] );
 				Blitter.DrawString( Blitter.GetConsoleX( i==0 ), Blitter.GetConsoleY(), String);
+				//Blitter.DrawNumber( Blitter.GetConsoleX( i==0 ), Blitter.GetConsoleY(), Addr[i] );
 			}
 		}
 	};
 	
 #define BIN_PAD_SCALAR	1
 	
-	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)*BIN_PAD_SCALAR, true );
+#define USE_BIG_ALLOCATION	true
+	
+	TGpuMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)*BIN_PAD_SCALAR, !USE_BIG_ALLOCATION );
 	DebugAlloc( TileBins, "Tile Bins" );
 
-	TGpuMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE*BIN_PAD_SCALAR, true );
+	//TileBins.Clear(0x3f);
+	
+	TGpuMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE*BIN_PAD_SCALAR, !USE_BIG_ALLOCATION );
 	DebugAlloc( TileState, "Tile State" );
 	
-	TGpuMemory Program0( 4096, true );
+	//TileState.Clear(0x4d);
+	
+	TGpuMemory Program0( 4096, !USE_BIG_ALLOCATION );
 	DebugAlloc( Program0, "Program0" );
 	
-	TGpuMemory Program1( 4096, true );
+	TGpuMemory Program1( 4096, !USE_BIG_ALLOCATION );
 	DebugAlloc( Program1, "Program1" );
+
 	
+#if USE_BIG_ALLOCATION==true
+	TGpuMemory BigAlloc( TileBins.GetSize() + TileState.GetSize() +  Program0.GetSize() + Program1.GetSize(), true );
+	DebugAlloc( BigAlloc, "BigAlloc" );
+#endif
+
 	
 	uint32_t Tick = 0;
 	while ( true )
 	{
+#if USE_BIG_ALLOCATION==true
+		auto* TileBinMem = reinterpret_cast<TTileBin*>( BigAlloc.GetGpuAddress() );
+		auto* TileStateMem = BigAlloc.GetGpuAddress() + TileBins.GetSize();
+		auto* Program0Mem = TileStateMem + TileState.GetSize();
+		auto* Program1Mem = Program0Mem + Program0.GetSize();
+#else
+		auto* TileBinMem = reinterpret_cast<TTileBin*>( TileBins.GetGpuAddress() );
+		auto* TileStateMem = TileState.GetGpuAddress();
+		auto* Program0Mem = Program0.GetGpuAddress();
+		auto* Program1Mem = Program1.GetGpuAddress();
+#endif
 		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Tick ");
 		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
 		
 		Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
-		
-		if ( !Display.SetupBinControl( Program0.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()), TileBins.GetSize(), TileState.GetGpuAddress() ) )
+	
+		DebugMemoryDump( TileBins, "Tile bins init", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
+		DebugMemoryDump( TileState, "Tile State init", Display, TILE_STRUCT_SIZE );
+
+		if ( !Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem ) )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
 			TKernel::Sleep(10);
@@ -551,9 +585,12 @@ CAPI int notmain ( void )
 		}
 
 		DebugMemoryDump( TileBins, "Tile bins", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
-		
+		DebugMemoryDump( TileState, "Tile State", Display, TILE_STRUCT_SIZE );
+#if USE_BIG_ALLOCATION==true
+		DebugMemoryDump( BigAlloc, "BigAlloc", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
+#endif
 		//	gr this actually draws...
-		if ( !Display.SetupRenderControl( Program1.GetGpuAddress(), reinterpret_cast<TTileBin*>(TileBins.GetGpuAddress()) ) )
+		if ( !Display.SetupRenderControl( Program1Mem, TileBinMem) )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
 			TKernel::Sleep(10);
@@ -563,6 +600,7 @@ CAPI int notmain ( void )
 			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl success");
 		}
 		DebugMemoryDump( TileBins, "Tile bins post render", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
+		DebugMemoryDump( TileState, "Tile State post render", Display, TILE_STRUCT_SIZE );
 	
 		return 1;
 		Tick++;

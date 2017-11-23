@@ -95,6 +95,16 @@ TGpuMemory::TGpuMemory(uint32_t Size,bool Lock) :
 	mLockedAddress = this->Lock();
 }
 
+void TGpuMemory::Clear(uint8_t Value)
+{
+	auto* Addr = GetGpuAddress();
+	for ( int i=0;	i<mSize;	i++ )
+	{
+		Addr[i] = Value;
+	}
+}
+
+
 void TGpuMemory::Free()
 {
 	Unlock();
@@ -137,11 +147,15 @@ bool TGpuMemory::Unlock()
 
 uint8_t* TGpuMemory::GetCpuAddress() const
 {
+	if ( !mLockedAddress )
+		return nullptr;
 	return TKernel::GetCpuAddress(mLockedAddress);
 }
 
 uint8_t* TGpuMemory::GetGpuAddress() const
 {
+	if ( !mLockedAddress )
+		return nullptr;
 	return TKernel::GetGpuAddress(mLockedAddress);
 }
 

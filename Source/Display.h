@@ -47,6 +47,8 @@ class TGpuMemory
 	public:
 	TGpuMemory(uint32_t Size,bool Lock);
 	
+	void		Clear(uint8_t Value);
+	
 	//	gr: making this explicit instead of in destructor as I can't debug to make sure any RValue copy is working correctly
 	void 		Free();
 	
