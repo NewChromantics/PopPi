@@ -422,7 +422,14 @@ void DrawScreen(TDisplay& Display,int Tick)
  }
  */
 
-	
+
+uint8_t gTileBin[8192*4]  __attribute__ ((aligned(16)));
+uint8_t gTileState[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
+//static volatile uint32_t* TileBin = (uint32_t*)0x00400000;
+//static volatile uint8_t* TileState = (uint8_t*)00500000;
+uint8_t gProgram0[0x1000]  __attribute__ ((aligned(4)));
+uint8_t gProgram1[0x1000]  __attribute__ ((aligned(4)));
+
 
 
 CAPI int notmain ( void )
@@ -465,8 +472,19 @@ CAPI int notmain ( void )
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Screen Buffer address = ");
 	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), (uint32_t)Display.mScreenBuffer );
 	
-#define TALLOCMemory	TGpuMemory
 	
+#define USE_MAPPED_ALLOCATION
+
+#if defined(USE_MAPPED_ALLOCATION)
+	#define TALLOCMemory	TMappedMemory
+	#define USE_BIG_ALLOCATION	false
+#else
+	#define USE_BIG_ALLOCATION	true
+	#define TALLOCMemory	TCpuMemory
+#endif
+	
+#define GetBUFFERAddress	GetAllocAddress
+
 	auto DebugAlloc = [&Display](TALLOCMemory& Mem,const char* Name)
 	{
 		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), Name );
@@ -482,7 +500,7 @@ CAPI int notmain ( void )
 	
 	auto DebugMemoryDump = [](TALLOCMemory& Memory,const char* Name,TBlitter& Blitter,int ChunkSize)
 	{
-		auto* Mem = Memory.GetGpuAddress();
+		auto* Mem = Memory.GetBUFFERAddress();
 		
 		Blitter.DrawString( Blitter.GetConsoleX(), Blitter.GetConsoleY(), "Memory dump of ");
 		Blitter.DrawString( Blitter.GetConsoleX(false), Blitter.GetConsoleY(), Name );
@@ -528,17 +546,28 @@ CAPI int notmain ( void )
 	
 #define BIN_PAD_SCALAR	1
 	
-#define USE_BIG_ALLOCATION	true
 	
+#if defined(USE_MAPPED_ALLOCATION)
+	
+	TMappedMemory TileBins( gTileBin );
+	DebugAlloc( TileBins, "Tile Bins" );
+	
+	TMappedMemory TileState( gTileState );
+	DebugAlloc( TileState, "Tile State" );
+	
+	TMappedMemory Program0( gProgram0 );
+	DebugAlloc( Program0, "Program0" );
+	
+	TMappedMemory Program1( gProgram1 );
+	DebugAlloc( Program1, "Program1" );
+	
+	
+#else
 	TALLOCMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)*BIN_PAD_SCALAR, !USE_BIG_ALLOCATION );
 	DebugAlloc( TileBins, "Tile Bins" );
 
-	//TileBins.Clear(0x3f);
-	
 	TALLOCMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE*BIN_PAD_SCALAR, !USE_BIG_ALLOCATION );
 	DebugAlloc( TileState, "Tile State" );
-	
-	//TileState.Clear(0x4d);
 	
 	TALLOCMemory Program0( 4096, !USE_BIG_ALLOCATION );
 	DebugAlloc( Program0, "Program0" );
@@ -551,21 +580,22 @@ CAPI int notmain ( void )
 	TALLOCMemory BigAlloc( TileBins.GetSize() + TileState.GetSize() +  Program0.GetSize() + Program1.GetSize(), true );
 	DebugAlloc( BigAlloc, "BigAlloc" );
 #endif
+#endif
 
 	
 	uint32_t Tick = 0;
 	while ( true )
 	{
 #if USE_BIG_ALLOCATION==true
-		auto* TileBinMem = reinterpret_cast<TTileBin*>( BigAlloc.GetAllocAddress() );
-		auto* TileStateMem = BigAlloc.GetAllocAddress() + TileBins.GetSize();
+		auto* TileBinMem = reinterpret_cast<TTileBin*>( BigAlloc.GetBUFFERAddress() );
+		auto* TileStateMem = BigAlloc.GetBUFFERAddress() + TileBins.GetSize();
 		auto* Program0Mem = TileStateMem + TileState.GetSize();
 		auto* Program1Mem = Program0Mem + Program0.GetSize();
 #else
-		auto* TileBinMem = reinterpret_cast<TTileBin*>( TileBins.GetAllocAddress() );
-		auto* TileStateMem = TileState.GetAllocAddress();
-		auto* Program0Mem = Program0.GetAllocAddress();
-		auto* Program1Mem = Program1.GetAllocAddress();
+		auto* TileBinMem = reinterpret_cast<TTileBin*>( TileBins.GetBUFFERAddress() );
+		auto* TileStateMem = TileState.GetBUFFERAddress();
+		auto* Program0Mem = Program0.GetBUFFERAddress();
+		auto* Program1Mem = Program1.GetBUFFERAddress();
 #endif
 		Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Tick ");
 		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
@@ -606,6 +636,7 @@ CAPI int notmain ( void )
 		DebugMemoryDump( TileBins, "Tile bins post render", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
 		DebugMemoryDump( TileState, "Tile State post render", Display, TILE_STRUCT_SIZE );
 	
+		Abort=true;
 		if ( Abort )
 			return 1;
 

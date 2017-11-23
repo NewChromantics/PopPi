@@ -13,7 +13,7 @@
 
 
 
-typedef uint8_t TTileBin;
+typedef uint32_t TTileBin;
 
 
 enum class TGpuMemFlags : uint32_t
@@ -85,6 +85,9 @@ public:
 	uint8_t*	GetBusAddress() const;
 	uint8_t*	GetAllocAddress() const	{	return mLockedAddress;	}
 	
+	
+
+	
 	uint8_t*	Lock();
 	bool		Unlock();
 	
@@ -92,6 +95,37 @@ public:
 	uint32_t	mHandle;
 	size_t		mSize;
 	uint8_t*	mLockedAddress;
+};
+
+
+class TMappedMemory
+{
+public:
+	template<typename TYPE,size_t SIZE>
+	TMappedMemory(TYPE (& Memory)[SIZE]) :
+		mHandle			( 0x0051a11c ),
+		mLockedAddress	( Memory ),
+		mSize			( SIZE*sizeof(TYPE) )
+	{
+	}
+	
+	void		Clear(uint8_t Value);
+	
+	void 		Free()	{}
+	
+	size_t		GetSize() const				{	return mSize;	}
+	uint8_t*	GetCpuAddress() const;
+	uint8_t*	GetGpuAddress() const;
+	uint8_t*	GetBusAddress() const;
+	uint8_t*	GetAllocAddress() const	{	return mLockedAddress;	}
+	
+	uint8_t*	Lock()	{	return mLockedAddress;	}
+	bool		Unlock()	{	return true;	}
+	
+public:
+	uint32_t	mHandle;
+	uint8_t*	mLockedAddress;
+	size_t		mSize;
 };
 
 
@@ -113,8 +147,8 @@ public:
 	bool		SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory);
 	
 
-	uint8_t		GetTileWidth() const	{	return (mWidth%64)/64;	}	//	round down so we don't overflow pixel buffer
-	uint8_t		GetTileHeight() const	{	return (mHeight%64)/64;	}	//	round down so we don't overflow pixel buffer
+	uint8_t		GetTileWidth() const	{	return (mWidth-(mWidth%64))/64;	}	//	round down so we don't overflow pixel buffer
+	uint8_t		GetTileHeight() const	{	return (mHeight-(mHeight%64))/64;	}	//	round down so we don't overflow pixel buffer
 
 	TCanvas<uint32_t>	LockCanvas();
 	

@@ -64,6 +64,18 @@ uint32_t ReadV3dReg(int Register)
 }
 
 
+uint8_t* TGpuMemory::GetCpuAddress() const	{	return TKernel::GetCpuAddress(mLockedAddress);	}
+uint8_t* TGpuMemory::GetGpuAddress() const	{	return TKernel::GetGpuAddress(mLockedAddress);	}
+uint8_t* TGpuMemory::GetBusAddress() const	{	return TKernel::GetBusAddress(mLockedAddress);	}
+
+uint8_t* TCpuMemory::GetCpuAddress() const	{	return TKernel::GetCpuAddress(mLockedAddress);	}
+uint8_t* TCpuMemory::GetGpuAddress() const	{	return TKernel::GetGpuAddress(mLockedAddress);	}
+uint8_t* TCpuMemory::GetBusAddress() const	{	return TKernel::GetBusAddress(mLockedAddress);	}
+
+uint8_t* TMappedMemory::GetCpuAddress() const	{	return TKernel::GetCpuAddress(mLockedAddress);	}
+uint8_t* TMappedMemory::GetGpuAddress() const	{	return TKernel::GetGpuAddress(mLockedAddress);	}
+uint8_t* TMappedMemory::GetBusAddress() const	{	return TKernel::GetBusAddress(mLockedAddress);	}
+
 
 
 
@@ -151,27 +163,6 @@ bool TGpuMemory::Unlock()
 	return Success;
 }
 
-
-uint8_t* TGpuMemory::GetCpuAddress() const
-{
-	if ( !mLockedAddress )
-		return nullptr;
-	return TKernel::GetCpuAddress(mLockedAddress);
-}
-
-uint8_t* TGpuMemory::GetGpuAddress() const
-{
-	if ( !mLockedAddress )
-		return nullptr;
-	return TKernel::GetGpuAddress(mLockedAddress);
-}
-
-uint8_t* TGpuMemory::GetBusAddress() const
-{
-	if ( !mLockedAddress )
-		return nullptr;
-	return TKernel::GetBusAddress(mLockedAddress);
-}
 
 
 
@@ -675,10 +666,10 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, MaxIndex);
 #endif
 	//	Flush
-//	addbyte(&p, 0x4);	//	flush
-	//addbyte(&p, 0x5);	//	flush all state
-//	addbyte(&p, 1);	//	nop
-//	addbyte(&p, 0);	//	halt
+	//addbyte(&p, 0x4);	//	flush
+	addbyte(&p, 0x5);	//	flush all state
+	addbyte(&p, 1);	//	nop
+	addbyte(&p, 0);	//	halt
 	
 	
 	
@@ -799,8 +790,8 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 	
 	addbyte(&Program, 0x5);	//	flush all state
 	
-	//addbyte(&Program, 1);	//	nop
-	//addbyte(&Program, 0);	//	halt
+	addbyte(&Program, 1);	//	nop
+	addbyte(&Program, 0);	//	halt
 	
 	return Program;
 }
@@ -896,7 +887,7 @@ bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
 		}
 		else
 		{
-			DrawString( GetConsoleX(), GetConsoleY(), "waiting for thread 1" );
+			//DrawString( GetConsoleX(), GetConsoleY(), "waiting for thread 1" );
 		}
 		TKernel::Sleep(100);
 	}
@@ -921,7 +912,7 @@ int gCpuMemoryBlockHandleNext = 1;
 
 
 TCpuMemory::TCpuMemory(uint32_t Size,bool Lock) :
-	mHandle			( gCpuMemoryBlockHandleNext++ ),
+	mHandle			( 0xa110c000 | (gCpuMemoryBlockHandleNext++) ),
 	mSize			( Size ),
 	mLockedAddress	( nullptr )
 {
@@ -964,26 +955,3 @@ bool TCpuMemory::Unlock()
 {
 	return true;
 }
-
-uint8_t* TCpuMemory::GetCpuAddress() const
-{
-	if ( !mLockedAddress )
-		return nullptr;
-	return TKernel::GetCpuAddress(mLockedAddress);
-}
-
-uint8_t* TCpuMemory::GetGpuAddress() const
-{
-	if ( !mLockedAddress )
-		return nullptr;
-	return TKernel::GetGpuAddress(mLockedAddress);
-}
-
-uint8_t* TCpuMemory::GetBusAddress() const
-{
-	if ( !mLockedAddress )
-		return nullptr;
-	return TKernel::GetBusAddress(mLockedAddress);
-}
-
-

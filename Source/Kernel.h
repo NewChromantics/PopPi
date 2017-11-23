@@ -52,8 +52,8 @@ public:
 	TKernel();
 	
 
-	//#define CPU_START_ADDRESS	0x40000000
-	#define CPU_START_ADDRESS	0x00000000
+	#define CPU_START_ADDRESS	0x40000000
+	//#define CPU_START_ADDRESS	0x00000000
 #define GPU_START_ADDRESS	0x80000000
 //#define GPU_START_ADDRESS	0x08000000
 #define BUS_MASK_ADDRESS	0x3fffffff
@@ -68,6 +68,8 @@ public:
 	template<typename T>
 	static T*	GetGpuAddress(T* Addr)
 	{
+		if ( !Addr )
+			return Addr;
 		//	map memory address to physical address... so... the cached/physical memory/virtual memory address over the bus
 		//	gr: note; not l1cache!
 		//	L2cache enabled
@@ -84,6 +86,8 @@ public:
 	template<typename T>
 	static T*	GetCpuAddress(T* Addr)
 	{
+		if ( !Addr )
+			return Addr;
 		auto Addr32 = (uint32_t)Addr;
 		Addr32 &= BUS_MASK_ADDRESS;
 		Addr32 |= CPU_START_ADDRESS;
@@ -93,6 +97,8 @@ public:
 	template<typename T>
 	static T*	GetBusAddress(T* Addr)
 	{
+		if ( !Addr )
+			return Addr;
 		auto Addr32 = (uint32_t)Addr;
 		Addr32 &= BUS_MASK_ADDRESS;
 		return (T*)Addr32;
