@@ -473,14 +473,14 @@ CAPI int notmain ( void )
 	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), (uint32_t)Display.mScreenBuffer );
 	
 	
-#define USE_MAPPED_ALLOCATION
+//#define USE_MAPPED_ALLOCATION
 
 #if defined(USE_MAPPED_ALLOCATION)
 	#define TALLOCMemory	TMappedMemory
 	#define USE_BIG_ALLOCATION	false
 #else
-	#define USE_BIG_ALLOCATION	true
-	#define TALLOCMemory	TCpuMemory
+	#define USE_BIG_ALLOCATION	false
+	#define TALLOCMemory	TGpuMemory
 #endif
 	
 #define GetBUFFERAddress	GetAllocAddress
@@ -601,7 +601,7 @@ CAPI int notmain ( void )
 		Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
 		
 		//Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
-		Display.mClearColour = RGBA( 255, 255, 255, 255 );
+		Display.mClearColour = RGBA( 255, Tick%255, 255, 255 );
 	
 
 		if ( !Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem ) )
@@ -635,12 +635,12 @@ CAPI int notmain ( void )
 		DebugMemoryDump( TileBins, "Tile bins post render", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
 		DebugMemoryDump( TileState, "Tile State post render", Display, TILE_STRUCT_SIZE );
 	
-		Abort=true;
+		//Abort=true;
 		if ( Abort )
 			return 1;
 
 		Tick++;
-		TKernel::Sleep(100);
+		//TKernel::Sleep(100);
 	}
 
 

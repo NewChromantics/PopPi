@@ -17,7 +17,7 @@
 //#define BINTHREAD_NOPHALT		//	adding causes thread1 error
 //#define RENDERTHREAD_FLUSH		//	adding causes thread1 error
 //#define RENDERTHREAD_FLUSHALL	//	adding causes thread1 error
-#define RENDERTHREAD_NOPHALT
+//#define RENDERTHREAD_NOPHALT
 
 #define GetTHREADAddress32			GetUnmodifiedAddress32
 #define GetSCREENBUFFERAddress32	GetBusAddress32
