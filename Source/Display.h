@@ -36,7 +36,10 @@ public:
 	void		GpuExecute(size_t ProgramSizeAlloc,LAMBDA& SetupProgram,TGpuThread GpuThread);
 	void		GpuNopTest();
 	
-	bool		SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory);
+	//	returns program end
+	void*		SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory);
+	bool		ExecuteThread0(void* ProgramStart,void* ProgramEnd);
+
 	uint8_t*	SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory);
 	bool		SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory);
 	

@@ -587,20 +587,28 @@ CAPI int notmain ( void )
 
 	bool DrawTick = true;
 	
+	
+	
+#if USE_BIG_ALLOCATION==true
+	auto* TileBinMem = reinterpret_cast<TTileBin*>( BigAlloc.GetBUFFERAddress() );
+	auto* TileStateMem = BigAlloc.GetBUFFERAddress() + TileBins.GetSize();
+	auto* Program0Mem = TileStateMem + TileState.GetSize();
+	auto* Program1Mem = Program0Mem + Program0.GetSize();
+#else
+	auto* TileBinMem = reinterpret_cast<TTileBin*>( TileBins.GetBUFFERAddress() );
+	auto* TileStateMem = TileState.GetBUFFERAddress();
+	auto* Program0Mem = Program0.GetBUFFERAddress();
+	auto* Program1Mem = Program1.GetBUFFERAddress();
+#endif
+	
+	void* Program0End = Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem );
+
+	
+	
 	uint32_t Tick = 0;
 	while ( true )
 	{
-#if USE_BIG_ALLOCATION==true
-		auto* TileBinMem = reinterpret_cast<TTileBin*>( BigAlloc.GetBUFFERAddress() );
-		auto* TileStateMem = BigAlloc.GetBUFFERAddress() + TileBins.GetSize();
-		auto* Program0Mem = TileStateMem + TileState.GetSize();
-		auto* Program1Mem = Program0Mem + Program0.GetSize();
-#else
-		auto* TileBinMem = reinterpret_cast<TTileBin*>( TileBins.GetBUFFERAddress() );
-		auto* TileStateMem = TileState.GetBUFFERAddress();
-		auto* Program0Mem = Program0.GetBUFFERAddress();
-		auto* Program1Mem = Program1.GetBUFFERAddress();
-#endif
+
 		if ( DrawTick )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.mHeight-9, "Tick ");
@@ -609,9 +617,8 @@ CAPI int notmain ( void )
 		
 		//Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
 		Display.mClearColour = RGBA( Tick%255, (Tick/10)%255, (Tick/100)%255, 255 );
-	
-
-		if ( !Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem ) )
+		
+		if ( !Display.ExecuteThread0( Program0Mem, Program0End ) )
 		{
 			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
 			TKernel::Sleep(10);

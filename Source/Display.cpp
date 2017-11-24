@@ -789,7 +789,7 @@ uint8_t ShaderState_5[200]  __attribute__ ((aligned(16)));
 uint8_t ShaderState_6[200]  __attribute__ ((aligned(16)));
 
 
-bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
+void* TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
 {
 	//	CONTROL_LIST_BIN_STRUCT
 	auto* p = TKernel::GetPROGRAMMEMAddress((uint8_t*)ProgramMemory);
@@ -891,6 +891,11 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	
 	auto* ProgramMemoryEnd = p;
 	
+	return ProgramMemoryEnd;
+}
+
+bool TDisplay::ExecuteThread0(void* ProgramStart,void* ProgramEnd)
+{
 #if defined(RESET_THREAD0)
 	{
 		//	reset thread...
@@ -912,20 +917,14 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	if ( !WaitForThread(0) )
 		return false;
 	
-
-	
-	*GetV3dReg(V3D_CT0CA) = TKernel::GetTHREADAddress32(ProgramMemory);
-	*GetV3dReg(V3D_CT0EA) = TKernel::GetTHREADAddress32(ProgramMemoryEnd);
+	*GetV3dReg(V3D_CT0CA) = TKernel::GetTHREADAddress32(ProgramStart);
+	*GetV3dReg(V3D_CT0EA) = TKernel::GetTHREADAddress32(ProgramEnd);
 	
 	if ( !WaitForThread(0) )
 		return false;
 	
-
-	
 	return true;
 }
-
-
 
 
 uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory)
