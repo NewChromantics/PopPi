@@ -418,25 +418,25 @@ uint32_t Frag_ColourToVaryings[] __attribute__ ((aligned(16)))=
 
 uint32_t Frag_White[] __attribute__ ((aligned(16)))=
 {
-	EndianSwap32( 0x009E7000 ),
-	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
+	0x009E7000,
+	0x100009E7,	//	nop; nop; nop
 	
-	EndianSwap32( 0xFFFFFFFF ),	//	RGBA White
-	EndianSwap32( 0xE0020BA7 ),	//	ldi tlbc, $FFFFFFFF
-	EndianSwap32( 0x009E7000 ),
-	EndianSwap32( 0x500009E7 ),	//	nop; nop; sbdone
-	EndianSwap32( 0x009E7000 ),
-	EndianSwap32( 0x300009E7 ),	//	nop; nop; thrend
+	0xFFFFFFFF,	//	RGBA White
+	0xE0020BA7,	//	ldi tlbc, $FFFFFFFF
+	0x009E7000,
+	0x500009E7,	//	nop; nop; sbdone
+	0x009E7000,
+	0x300009E7,	//	nop; nop; thrend
 	
-	EndianSwap32( 0x009E7000 ),
-	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
-	EndianSwap32( 0x009E7000 ),
-	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
+	0x009E7000,
+	0x100009E7,	//	nop; nop; nop
+	0x009E7000,
+	0x100009E7,	//	nop; nop; nop
 };
 
 
 //	PSE not PTB
-struct TVertex
+struct TVertexAndColour
 {
 	uint16_t		x;	//	12.4 Fixed Point
 	uint16_t		y;	//	12.4 Fixed Point
@@ -450,13 +450,12 @@ struct TVertex
 	static uint8_t		GetVaryingsCount()	{	return 3;	}
 };
 
-static_assert( sizeof(TVertex) == 6*4, "Vertex is unexpected size");
-#define VERTEX_COUNT	9
-TVertex VERTEX_DATA[VERTEX_COUNT] __attribute__ ((aligned(16))) =
+static_assert( sizeof(TVertexAndColour) == 6*4, "Vertex is unexpected size");
+TVertexAndColour VertexAndColours[] __attribute__ ((aligned(16))) =
 {
 	{	Fixed12_4(1,0),		Fixed12_4(1,0),	1,1, 	1,0,0	},
 	{	Fixed12_4(100,0),	Fixed12_4(1,0),	1,1, 	0,1,0	},
-	{	Fixed12_4(100,0),	Fixed12_4(100,0),	1,1, 	0,0,1	},
+	{	Fixed12_4(50,0),	Fixed12_4(100,0),	1,1, 	0,0,1	},
 
 	{	Fixed12_4(101,0),	Fixed12_4(110,0),	1,1, 	1,1,0	},
 	{	Fixed12_4(200,0),	Fixed12_4(150,0),	1,1, 	0,1,1	},
@@ -494,11 +493,11 @@ TVertexPos VertexDataPos[] __attribute__ ((aligned(16))) =
 };
 
 
-uint8_t VERTEX_INDEXES[VERTEX_COUNT] __attribute__ ((aligned(16))) =
+uint8_t Indexes_0_x3[] __attribute__ ((aligned(16))) =
 {
 	0,1,2
 };
-uint8_t VERTEX_INDEXES_9[9] __attribute__ ((aligned(16))) =
+uint8_t Indexes_0_x9[] __attribute__ ((aligned(16))) =
 {
 	0,1,2,
 	3,4,5,
@@ -790,45 +789,6 @@ uint8_t ShaderState_4[200]  __attribute__ ((aligned(16)));
 uint8_t ShaderState_5[200]  __attribute__ ((aligned(16)));
 uint8_t ShaderState_6[200]  __attribute__ ((aligned(16)));
 
-uint8_t ShaderState_X[200]  __attribute__ ((aligned(16)));
-
-
-uint8_t* SetupVertexShaderState()
-{
-	uint8_t* p = ShaderState_X;
-	
-	addbyte(&p, 0);                      // flags
-	addbyte(&p, sizeof(VertexDataPos[0]));                    // stride
-	addbyte(&p, 0);                      // num uniforms (not used)
-	addbyte(&p, 0);                      // num varyings
-	addword(&p, (uint32_t)Frag_White);      // Fragment shader code
-	addword(&p, (uint32_t)0);      // Fragment shader uniforms
-	addword(&p, (uint32_t)VertexDataPos);
-	
-	/*
-  //  Flag Bits: 0 = Fragment Shader Is Single Threaded,
-  //  1 = Point Size Included In Shaded Vertex Data,
-  //  2 = Enable Clipping,
-  //  3 = Clip Coordinates Header Included In Shaded Vertex Data
-  uint8_t Flags = 0;
-  uint8_t VertexDataStride = sizeof(TVertex);
-	 +
-  uint8_t UniformCount = 0;  //  docs: currently unused
-  uint8_t VaryingsCount = 3;
-  void* FragShaderUniforms = nullptr;
-  void* VertexData = VERTEX_DATA;
-  void* FragShader = FRAGMENT_SHADER_CODE;
-	 
-  addbyte( &ShaderState, Flags );
-  addbyte( &ShaderState, VertexDataStride );
-  addbyte( &ShaderState, UniformCount );
-  addbyte( &ShaderState, VaryingsCount );
-  addword( &ShaderState, (uint32_t)FragShader );
-  addword( &ShaderState, (uint32_t)FragShaderUniforms );
-  addword( &ShaderState, (uint32_t)VertexData );
-  */
-	return ShaderState_X;
-}
 
 bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
 {
@@ -861,20 +821,15 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	BinControlProgram::SetPrimitiveConfiguration( p );
 	BinControlProgram::SetViewportOffset( p, uint16_2(0,0) );
 	
-	BinControlProgram::PushTriangles( p, ShaderState_0, VertexDataPos, VERTEX_INDEXES, Frag_White );
-/*
-	BinControlProgram::PushTriangles( p, ShaderState_1, VERTEX_DATA, VERTEX_INDEXES, Frag_White );
-
-	BinControlProgram::PushTriangles( p, ShaderState_2, VertexDataPos, VERTEX_INDEXES, Frag_ColourToVaryings );
+	//BinControlProgram::PushTriangles( p, ShaderState_0, VertexDataPos, Indexes_0_x3, Frag_White );
+	//BinControlProgram::PushTriangles( p, ShaderState_1, VertexAndColours, Indexes_0_x3, Frag_White );
+	//BinControlProgram::PushTriangles( p, ShaderState_2, VertexDataPos, Indexes_0_x3, Frag_ColourToVaryings );
+	//BinControlProgram::PushTriangles( p, ShaderState_1, VertexAndColours, Indexes_0_x9, Frag_ColourToVaryings );
+	//BinControlProgram::PushTriangles( p, ShaderState_3, VertexDataPos, Frag_White );
+	//BinControlProgram::PushTriangles( p, ShaderState_4, VertexAndColours, Frag_White );
+	//BinControlProgram::PushTriangles( p, ShaderState_5, VertexDataPos, Frag_ColourToVaryings );
+	BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_ColourToVaryings );
 	
-	BinControlProgram::PushTriangles( p, ShaderState_3, VertexDataPos, Frag_White );
-	
-	BinControlProgram::PushTriangles( p, ShaderState_4, VERTEX_DATA, Frag_White );
-	
-	BinControlProgram::PushTriangles( p, ShaderState_5, VertexDataPos, Frag_ColourToVaryings );
-	
-	BinControlProgram::PushTriangles( p, ShaderState_6, VERTEX_DATA, Frag_ColourToVaryings );
-	*/
 	
 
 	/*gr: stalls thread
