@@ -600,7 +600,7 @@ void BinControlProgram::SetPrimitiveConfiguration(uint8_t*& Program)
 #define CoverageReadType				(1<<5)
 	//	rasteriser oversample mode 0,1,2,3
 	uint8_t Config0 = 0;
-	//Config0 |= Enable_Forward_Facing_Primitive;	//	hang - because triangles are not culled?
+	Config0 |= Enable_Forward_Facing_Primitive;	//	hang - because triangles are not culled?
 	//Config0 |= Enable_Reverse_Facing_Primitive | Clockwise;	//	hang - because triangles are not culled?
 	Config0 |= Enable_Reverse_Facing_Primitive;	//	not hang, presumably culled
 
@@ -741,6 +741,7 @@ template<typename TVERTEX,uint32_t VERTEXCOUNT>
 void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVERTEX (&Vertexes)[VERTEXCOUNT],const uint32_t* FragShader)
 {
 	static_assert( sizeof(Vertexes) == sizeof(TVERTEX)*VERTEXCOUNT, "Array or pointer?");
+	static_assert( (VERTEXCOUNT%3) == 0, "Misaligned triangle count");
 	
 	//	set primitive list format
 	uint8_t DataType = PrimitiveFormat::Triangles | PrimitiveFormat::Index16;
@@ -755,7 +756,7 @@ void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVE
 	//	push primitives
 	//	macro Indexed_Primitive_List data, length, address, maxindex { ; Control ID Code: Indexed Primitive List (OpenGL)
 	uint8_t Mode = PrimitiveList::Triangles;
-	uint32_t FirstIndex = 1;
+	uint32_t FirstIndex = 0;
 	addbyte(&Program, 33);
 	addbyte(&Program, Mode);
 	addword(&Program, VERTEXCOUNT );
