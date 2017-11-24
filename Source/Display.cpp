@@ -450,20 +450,22 @@ struct TVertexAndColour
 	static uint8_t		GetVaryingsCount()	{	return 3;	}
 };
 
-static_assert( sizeof(TVertexAndColour) == 6*4, "Vertex is unexpected size");
+
+#define LEFT	1
+#define TOP		1
+#define	RIGHT	500
+#define BOTTOM	500
+
+
 TVertexAndColour VertexAndColours[] __attribute__ ((aligned(16))) =
 {
-	{	Fixed12_4(1,0),		Fixed12_4(1,0),	1,1, 	1,0,0	},
-	{	Fixed12_4(100,0),	Fixed12_4(1,0),	1,1, 	0,1,0	},
-	{	Fixed12_4(50,0),	Fixed12_4(100,0),	1,1, 	0,0,1	},
-
-	{	Fixed12_4(101,0),	Fixed12_4(110,0),	1,1, 	1,1,0	},
-	{	Fixed12_4(200,0),	Fixed12_4(150,0),	1,1, 	0,1,1	},
-	{	Fixed12_4(200,0),	Fixed12_4(200,0),	1,1, 	1,0,1	},
-
-	{	Fixed12_4(4,0),		Fixed12_4(400,0),	1,1, 	1,0,1	},
-	{	Fixed12_4(550,0),	Fixed12_4(500,0),	1,1, 	1,1,1	},
-	{	Fixed12_4(600,0),	Fixed12_4(600,0),	1,1, 	0,0,0	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	1,0,0	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(BOTTOM,0),	1,1,	0,1,0	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1,	0,0,1	},
+	
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1,	1,1,0	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(TOP,0),		1,1,	0,1,1	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	1,0,1	},
 };
 
 //	PSE not PTB
@@ -479,17 +481,13 @@ struct TVertexPos
 
 TVertexPos VertexDataPos[] __attribute__ ((aligned(16))) =
 {
-	{	Fixed12_4(1,0),		Fixed12_4(1,0),		1,1	},
-	{	Fixed12_4(100,0),	Fixed12_4(1,0),		1,1	},
-	{	Fixed12_4(100,0),	Fixed12_4(100,0),	1,1	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(BOTTOM,0),	1,1	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1	},
 	
-	{	Fixed12_4(101,0),	Fixed12_4(110,0),	1,1	},
-	{	Fixed12_4(200,0),	Fixed12_4(150,0),	1,1	},
-	{	Fixed12_4(200,0),	Fixed12_4(200,0),	1,1	},
-	
-	{	Fixed12_4(4,0),		Fixed12_4(400,0),	1,1	},
-	{	Fixed12_4(550,0),	Fixed12_4(500,0),	1,1	},
-	{	Fixed12_4(600,0),	Fixed12_4(600,0),	1,1	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(TOP,0),		1,1	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1	},
 };
 
 
