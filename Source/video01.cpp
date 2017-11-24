@@ -3,6 +3,7 @@
 #include "Blitter.h"
 #include "Display.h"
 #include "Mailbox.h"
+#include "Memory.h"
 
 
 uint32_t TKernel::mCpuMemoryBase = 0xbad0bad1;
