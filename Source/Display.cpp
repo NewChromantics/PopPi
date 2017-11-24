@@ -391,11 +391,9 @@ void TDisplay::GpuNopTest()
  uint8_t gProgram0[4096*4]  __attribute__ ((aligned(16)));
  uint8_t gProgram1[4096*4]  __attribute__ ((aligned(16)));
 	*/
-//	128bit align
-uint8_t NV_SHADER_STATE_RECORD[200]  __attribute__ ((aligned(16)));
-uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
+
+uint32_t Frag_ColourToVaryings[] __attribute__ ((aligned(16)))=
 {
-	/*
 	//	hackdriver
 	0x958e0dbf,
 	0xd1724823,// mov r0, vary; mov r3.8d, 1.0
@@ -415,8 +413,11 @@ uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 	0x100009e7, // nop; nop; nop
 	0x009e7000,
 	0x500009e7, // nop; nop; sbdone
-*/
-	//	Fill Color Shader
+};
+
+
+uint32_t Frag_White[] __attribute__ ((aligned(16)))=
+{
 	EndianSwap32( 0x009E7000 ),
 	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
 	
@@ -431,57 +432,65 @@ uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
 	EndianSwap32( 0x009E7000 ),
 	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
-	
-	
 };
 
+
+//	PSE not PTB
 struct TVertex
 {
-	uint16_t	x;	//	12.4 Fixed Point
-	uint16_t	y;	//	12.4 Fixed Point
-	float		z;	//	float
-	float		w;	//	float
+	uint16_t		x;	//	12.4 Fixed Point
+	uint16_t		y;	//	12.4 Fixed Point
+	float		z;
+	float		w;
 	float		r;
 	float		g;
 	float		b;
+	
+	//	gr: this is always (size/32bit)-(3xyz)
+	static uint8_t		GetVaryingsCount()	{	return 3;	}
 };
+
 static_assert( sizeof(TVertex) == 6*4, "Vertex is unexpected size");
 #define VERTEX_COUNT	9
 TVertex VERTEX_DATA[VERTEX_COUNT] __attribute__ ((aligned(16))) =
 {
-	{	EndianSwap16(1 * 16),	EndianSwap16(1 * 16),	1,1, 	1,0,0	},
-	{	EndianSwap16(100 * 16),	EndianSwap16(1 * 16),	1,1, 	0,1,0	},
-	{	EndianSwap16(100 * 16),	EndianSwap16(100 * 16),	1,1, 	0,0,1	},
+	{	Fixed12_4(1,0),		Fixed12_4(1,0),	1,1, 	1,0,0	},
+	{	Fixed12_4(100,0),	Fixed12_4(1,0),	1,1, 	0,1,0	},
+	{	Fixed12_4(100,0),	Fixed12_4(100,0),	1,1, 	0,0,1	},
 
-	{	EndianSwap16(101 * 16),	EndianSwap16(110 * 16),	1,1, 	1,1,0	},
-	{	EndianSwap16(200 * 16),	EndianSwap16(150 * 16),	1,1, 	0,1,1	},
-	{	EndianSwap16(200 * 16),	EndianSwap16(200 * 16),	1,1, 	1,0,1	},
+	{	Fixed12_4(101,0),	Fixed12_4(110,0),	1,1, 	1,1,0	},
+	{	Fixed12_4(200,0),	Fixed12_4(150,0),	1,1, 	0,1,1	},
+	{	Fixed12_4(200,0),	Fixed12_4(200,0),	1,1, 	1,0,1	},
 
-	{	EndianSwap16(4 * 16),	EndianSwap16(400 * 16),	1,1, 	1,0,1	},
-	{	EndianSwap16(550 * 16),	EndianSwap16(500 * 16),	1,1, 	1,1,1	},
-	{	EndianSwap16(600 * 16),	EndianSwap16(600 * 16),	1,1, 	0,0,0	},
+	{	Fixed12_4(4,0),		Fixed12_4(400,0),	1,1, 	1,0,1	},
+	{	Fixed12_4(550,0),	Fixed12_4(500,0),	1,1, 	1,1,1	},
+	{	Fixed12_4(600,0),	Fixed12_4(600,0),	1,1, 	0,0,0	},
 };
 
+//	PSE not PTB
 struct TVertexPos
 {
 	uint16_t	x;	//	12.4 Fixed Point
 	uint16_t	y;	//	12.4 Fixed Point
 	float		z;	//	float
 	float		w;	//	float
+	
+	static uint8_t		GetVaryingsCount()	{	return 0;	}
 };
+
 TVertexPos VertexDataPos[] __attribute__ ((aligned(16))) =
 {
-	{	EndianSwap16(1 * 16),	EndianSwap16(1 * 16),	1,1	},
-	{	EndianSwap16(100 * 16),	EndianSwap16(1 * 16),	1,1	},
-	{	EndianSwap16(100 * 16),	EndianSwap16(100 * 16),	1,1	},
+	{	Fixed12_4(1,0),		Fixed12_4(1,0),		1,1	},
+	{	Fixed12_4(100,0),	Fixed12_4(1,0),		1,1	},
+	{	Fixed12_4(100,0),	Fixed12_4(100,0),	1,1	},
 	
-	{	EndianSwap16(101 * 16),	EndianSwap16(110 * 16),	1,1	},
-	{	EndianSwap16(200 * 16),	EndianSwap16(150 * 16),	1,1	},
-	{	EndianSwap16(200 * 16),	EndianSwap16(200 * 16),	1,1	},
+	{	Fixed12_4(101,0),	Fixed12_4(110,0),	1,1	},
+	{	Fixed12_4(200,0),	Fixed12_4(150,0),	1,1	},
+	{	Fixed12_4(200,0),	Fixed12_4(200,0),	1,1	},
 	
-	{	EndianSwap16(4 * 16),	EndianSwap16(400 * 16),	1,1	},
-	{	EndianSwap16(550 * 16),	EndianSwap16(500 * 16),	1,1	},
-	{	EndianSwap16(600 * 16),	EndianSwap16(600 * 16),	1,1	},
+	{	Fixed12_4(4,0),		Fixed12_4(400,0),	1,1	},
+	{	Fixed12_4(550,0),	Fixed12_4(500,0),	1,1	},
+	{	Fixed12_4(600,0),	Fixed12_4(600,0),	1,1	},
 };
 
 
@@ -495,47 +504,6 @@ uint8_t VERTEX_INDEXES_9[9] __attribute__ ((aligned(16))) =
 	3,4,5,
 	4,6,5,
 };
-
-//	shouldnt be used...
-uint32_t FragUniforms[100] __attribute__ ((aligned(16))) =
-{
-};
-
-uint8_t* SetupVertexShaderState()
-{
-	uint8_t* p = NV_SHADER_STATE_RECORD;
-	
-	addbyte(&p, 0);											// flags
-	addbyte(&p, sizeof(VertexDataPos[0]));										// stride
-	addbyte(&p, 0);											// num uniforms (not used)
-	addbyte(&p, 0);											// num varyings
-	addword(&p, (uint32_t)FRAGMENT_SHADER_CODE);			// Fragment shader code
-	addword(&p, (uint32_t)0);			// Fragment shader uniforms
-	addword(&p, (uint32_t)VertexDataPos);
-	
-	/*
-	//	Flag Bits: 0 = Fragment Shader Is Single Threaded,
-	//	1 = Point Size Included In Shaded Vertex Data,
-	//	2 = Enable Clipping,
-	//	3 = Clip Coordinates Header Included In Shaded Vertex Data
-	uint8_t Flags = 0;
-	uint8_t VertexDataStride = sizeof(TVertex);
-	uint8_t UniformCount = 0;	//	docs: currently unused
-	uint8_t VaryingsCount = 3;
-	void* FragShaderUniforms = nullptr;
-	void* VertexData = VERTEX_DATA;
-	void* FragShader = FRAGMENT_SHADER_CODE;
-	
-	addbyte( &ShaderState, Flags );
-	addbyte( &ShaderState, VertexDataStride );
-	addbyte( &ShaderState, UniformCount );
-	addbyte( &ShaderState, VaryingsCount );
-	addword( &ShaderState, (uint32_t)FragShader );
-	addword( &ShaderState, (uint32_t)FragShaderUniforms );
-	addword( &ShaderState, (uint32_t)VertexData );
-	*/
-	return NV_SHADER_STATE_RECORD;
-}
 
 
 #define STATUS_ERROR		(1<<3)
@@ -587,6 +555,281 @@ bool WaitForThread(int ThreadIndex)
 }
 
 
+namespace BinControlProgram
+{
+	void	SetViewportOffset(uint8_t*& Program,uint16_2 xy);
+	void	SetClipWindow(uint8_t*& Program,uint16_2 xy,uint16_2 wh);
+	void	SetPrimitiveConfiguration(uint8_t*& Program);
+	void	Flush(uint8_t*& Program);
+
+	//	indexed triangles
+	template<typename TVERTEX,uint32_t VERTEXCOUNT,typename TINDEX,uint32_t INDEXCOUNT>
+	void	PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVERTEX (&Vertexes)[VERTEXCOUNT],TINDEX (&Indexes)[INDEXCOUNT],const uint32_t* FragShader);
+	
+	//	triangles
+	template<typename TVERTEX,uint32_t VERTEXCOUNT>
+	void	PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVERTEX (&Vertexes)[VERTEXCOUNT],const uint32_t* FragShader);
+	
+}
+
+void BinControlProgram::SetViewportOffset(uint8_t*& Program,uint16_2 xy)
+{
+	addbyte(&Program, 103);
+	addshort(&Program, xy.x);
+	addshort(&Program, xy.y);
+}
+
+void BinControlProgram::SetClipWindow(uint8_t*& Program,uint16_2 xy,uint16_2 wh)
+{
+	//	Clip_Window - left, bottom, width, height
+	addbyte(&Program, 102);
+	addshort(&Program, xy.x );
+	addshort(&Program, xy.y );
+	addshort(&Program, wh.x );
+	addshort(&Program, wh.y );
+
+}
+
+void BinControlProgram::SetPrimitiveConfiguration(uint8_t*& Program)
+{
+	
+#define Enable_Forward_Facing_Primitive	(1<<0)
+#define Enable_Reverse_Facing_Primitive	(1<<1)
+#define Clockwise						(1<<2)
+#define EnableDepthOffset				(1<<3)
+#define AntialiasPointsAndLines			(1<<4)
+#define CoverageReadType				(1<<5)
+	//	rasteriser oversample mode 0,1,2,3
+	uint8_t Config0 = 0;
+	//Config0 |= Enable_Forward_Facing_Primitive;	//	hang - because triangles are not culled?
+	//Config0 |= Enable_Reverse_Facing_Primitive | Clockwise;	//	hang - because triangles are not culled?
+	Config0 |= Enable_Reverse_Facing_Primitive;	//	not hang, presumably culled
+
+	
+#define CoveragePipe					(1<<0)
+	//	coverage write mode 0,1,2,3)
+	//	coverate read mode 	0,1
+#define DepthTest_Never					(0<<4)
+#define DepthTest_LessThan				(1<<4)
+#define DepthTest_Equal					(2<<4)
+#define DepthTest_LessEqual				(3<<4)
+#define DepthTest_GreatherThan			(4<<4)
+#define DepthTest_NotEqual				(5<<4)
+#define DepthTest_GreaterEqual			(6<<4)
+#define DepthTest_Always				(7<<4)
+#define Enable_DepthWrite				(1<<7)
+	uint8_t Config1 = DepthTest_Always;
+
+#define EarlyDepthRead					(1<<0)
+#define EarlyDepthWrite					(1<<1)
+	uint8_t Config2 = 0;//EarlyDepthWrite;;
+
+	addbyte(&Program, 96);
+	addbyte(&Program, Config0);
+	addbyte(&Program, Config1);
+	addbyte(&Program, Config2);
+	
+	
+}
+
+
+void BinControlProgram::Flush(uint8_t*& Program)
+{
+	#if defined(BINTHREAD_FLUSH)
+	addbyte(&Program, 0x4);	//	flush
+	#endif
+	#if defined(BINTHREAD_FLUSHALL)
+	addbyte(&Program, 0x5);	//	flush
+	#endif
+	#if defined(BINTHREAD_NOPHALT)
+	addbyte(&Program, 1);	//	nop
+	addbyte(&Program, 0);	//	halt
+	#endif
+
+}
+
+
+
+namespace PrimitiveFormat
+{
+	enum PrimitiveFormatType : uint8_t
+	{
+		Points		= 0,
+		Lines		= 1,
+		Triangles	= 2,
+		RHT			= 3,
+	};
+
+	enum PrimitiveFormatSize : uint8_t
+	{
+		Index16		= 1 << 4,	//	LdB-ECM says 16bit
+		XY32		= 3 << 4,	//	hackdriver says 16bit
+	};
+}
+
+namespace PrimitiveList
+{
+	//	primitive list
+	enum PrimitiveListType : uint8_t
+	{
+		Points		= 0,
+		Lines		= 1,
+		LineLoop	= 2,
+		LineStrip	= 3,
+		Triangles	= 4,
+		TriangleStrip	= 5,
+		TriangleFan		= 6,
+	};
+
+	enum PrimitiveListIndexType : uint8_t
+	{
+		Index8		= 0<<4,
+		Index16		= 1<<4,
+	};
+}
+
+template<typename TVERTEX,uint32_t VERTEXCOUNT,typename TINDEX,uint32_t INDEXCOUNT>
+void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVERTEX (&Vertexes)[VERTEXCOUNT],TINDEX (&Indexes)[INDEXCOUNT],const uint32_t* FragShader)
+{
+	static_assert( sizeof(TINDEX)==sizeof(uint8_t), "8 bit indexes");
+	static_assert( sizeof(Vertexes) == sizeof(TVERTEX)*VERTEXCOUNT, "Array or pointer?");
+	static_assert( sizeof(Indexes) == sizeof(TINDEX)*INDEXCOUNT, "Array or pointer?");
+	static_assert( INDEXCOUNT >= 3, "Not enough indexes");
+	static_assert( VERTEXCOUNT >= 3, "Not enough verts");
+
+	
+	//	set primitive list format
+	uint8_t DataType = PrimitiveFormat::Triangles | PrimitiveFormat::Index16;
+	addbyte(&Program, 56);
+	addbyte(&Program, DataType);
+	
+
+	//	no-vertex (NV) shader state
+	addbyte(&Program, 65);
+	addword(&Program, (uint32_t)ShaderState );
+
+	
+	//	push primitives
+	//	macro Indexed_Primitive_List data, length, address, maxindex { ; Control ID Code: Indexed Primitive List (OpenGL)
+	uint8_t Mode = PrimitiveList::Triangles | PrimitiveList::Index8;
+	uint32_t IndexCount = INDEXCOUNT;
+	uint32_t MaxIndex = INDEXCOUNT;	//	QPU will error if an index goes above this
+	addbyte(&Program, 32);
+	addbyte(&Program, Mode);
+	addword(&Program, IndexCount );
+	addword(&Program, (uint32_t)Indexes );
+	addword(&Program, MaxIndex );
+
+	
+	//	setup state
+	uint8_t StateFlags = 0;
+	//	Flag Bits: 0 = Fragment Shader Is Single Threaded,
+	//	1 = Point Size Included In Shaded Vertex Data,
+	//	2 = Enable Clipping,
+	//	3 = Clip Coordinates Header Included In Shaded Vertex Data
+	addbyte(&ShaderState, StateFlags);					// flags
+	addbyte(&ShaderState, sizeof(TVERTEX) );	// stride
+	addbyte(&ShaderState, 0);					// num uniforms (not used)
+	addbyte(&ShaderState, TVERTEX::GetVaryingsCount() );	// num varyings
+	addword(&ShaderState, (uint32_t)FragShader);	// pointer to fragment shader code
+	addword(&ShaderState, (uint32_t)0);				// pointer to Fragment shader uniforms
+	addword(&ShaderState, (uint32_t)Vertexes);	//	pointer to vertex data
+
+}
+
+
+template<typename TVERTEX,uint32_t VERTEXCOUNT>
+void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVERTEX (&Vertexes)[VERTEXCOUNT],const uint32_t* FragShader)
+{
+	static_assert( sizeof(Vertexes) == sizeof(TVERTEX)*VERTEXCOUNT, "Array or pointer?");
+	
+	//	set primitive list format
+	uint8_t DataType = PrimitiveFormat::Triangles | PrimitiveFormat::Index16;
+	addbyte(&Program, 56);
+	addbyte(&Program, DataType);
+	
+	
+	//	no-vertex (NV) shader state
+	addbyte(&Program, 65);
+	addword(&Program, (uint32_t)ShaderState );
+	
+	//	push primitives
+	//	macro Indexed_Primitive_List data, length, address, maxindex { ; Control ID Code: Indexed Primitive List (OpenGL)
+	uint8_t Mode = PrimitiveList::Triangles;
+	uint32_t FirstIndex = 1;
+	addbyte(&Program, 33);
+	addbyte(&Program, Mode);
+	addword(&Program, VERTEXCOUNT );
+	addword(&Program, FirstIndex );
+	
+	
+	//	setup state
+	uint8_t StateFlags = 0;
+	//	Flag Bits: 0 = Fragment Shader Is Single Threaded,
+	//	1 = Point Size Included In Shaded Vertex Data,
+	//	2 = Enable Clipping,
+	//	3 = Clip Coordinates Header Included In Shaded Vertex Data
+	addbyte(&ShaderState, StateFlags);					// flags
+	addbyte(&ShaderState, sizeof(TVERTEX) );	// stride
+	addbyte(&ShaderState, 0);					// num uniforms (not used)
+	addbyte(&ShaderState, TVERTEX::GetVaryingsCount() );	// num varyings
+	addword(&ShaderState, (uint32_t)FragShader);	// pointer to fragment shader code
+	addword(&ShaderState, (uint32_t)0);				// pointer to Fragment shader uniforms
+	addword(&ShaderState, (uint32_t)Vertexes);	//	pointer to vertex data
+	
+	
+}
+
+
+
+uint8_t ShaderState_0[200]  __attribute__ ((aligned(16)));
+uint8_t ShaderState_1[200]  __attribute__ ((aligned(16)));
+uint8_t ShaderState_2[200]  __attribute__ ((aligned(16)));
+uint8_t ShaderState_3[200]  __attribute__ ((aligned(16)));
+uint8_t ShaderState_4[200]  __attribute__ ((aligned(16)));
+uint8_t ShaderState_5[200]  __attribute__ ((aligned(16)));
+uint8_t ShaderState_6[200]  __attribute__ ((aligned(16)));
+
+uint8_t ShaderState_X[200]  __attribute__ ((aligned(16)));
+
+
+uint8_t* SetupVertexShaderState()
+{
+	uint8_t* p = ShaderState_X;
+	
+	addbyte(&p, 0);                      // flags
+	addbyte(&p, sizeof(VertexDataPos[0]));                    // stride
+	addbyte(&p, 0);                      // num uniforms (not used)
+	addbyte(&p, 0);                      // num varyings
+	addword(&p, (uint32_t)Frag_White);      // Fragment shader code
+	addword(&p, (uint32_t)0);      // Fragment shader uniforms
+	addword(&p, (uint32_t)VertexDataPos);
+	
+	/*
+  //  Flag Bits: 0 = Fragment Shader Is Single Threaded,
+  //  1 = Point Size Included In Shaded Vertex Data,
+  //  2 = Enable Clipping,
+  //  3 = Clip Coordinates Header Included In Shaded Vertex Data
+  uint8_t Flags = 0;
+  uint8_t VertexDataStride = sizeof(TVertex);
+	 +
+  uint8_t UniformCount = 0;  //  docs: currently unused
+  uint8_t VaryingsCount = 3;
+  void* FragShaderUniforms = nullptr;
+  void* VertexData = VERTEX_DATA;
+  void* FragShader = FRAGMENT_SHADER_CODE;
+	 
+  addbyte( &ShaderState, Flags );
+  addbyte( &ShaderState, VertexDataStride );
+  addbyte( &ShaderState, UniformCount );
+  addbyte( &ShaderState, VaryingsCount );
+  addword( &ShaderState, (uint32_t)FragShader );
+  addword( &ShaderState, (uint32_t)FragShaderUniforms );
+  addword( &ShaderState, (uint32_t)VertexData );
+  */
+	return ShaderState_X;
+}
+
 bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
 {
 	//	CONTROL_LIST_BIN_STRUCT
@@ -603,88 +846,35 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addbyte(&p, Flags);
 	
 	
+	TMappedMemory( ShaderState_0 ).Clear(0);
+	TMappedMemory( ShaderState_1 ).Clear(0);
+	TMappedMemory( ShaderState_2 ).Clear(0);
+	TMappedMemory( ShaderState_3 ).Clear(0);
+	TMappedMemory( ShaderState_4 ).Clear(0);
+	TMappedMemory( ShaderState_5 ).Clear(0);
+	TMappedMemory( ShaderState_6 ).Clear(0);
+	
 	//Start_Tile_Binning
 	addbyte(&p, 6);
 	
+	BinControlProgram::SetClipWindow( p, uint16_2(0,0), uint16_2(mWidth,mHeight) );
+	BinControlProgram::SetPrimitiveConfiguration( p );
+	BinControlProgram::SetViewportOffset( p, uint16_2(0,0) );
 	
-#define Enable_Forward_Facing_Primitive	0x01	//	Configuration_Bits: Enable Forward Facing Primitive
-#define Enable_Reverse_Facing_Primitive	0x02	//	Configuration_Bits: Enable Reverse Facing Primitive
-#define EarlyDepthWrite			0x02
-#define Mode_Triangles					0x04	//	Indexed_Primitive_List: Primitive Mode = Triangles
-#define Index_Type_8 					0x00	//	Indexed_Primitive_List: Index Type = 8-Bit
-#define Index_Type_16					0x10	//	Indexed_Primitive_List: Index Type = 16-Bit
-#define DepthTestDisabled				0x0
-#define DepthTestAlways					(7<<4)
-#define DepthTestNever					(0<<4)
-	
-	//	primitive list
-	enum PrimitiveType : uint8_t
-	{
-		Points		= 0,
-		Lines		= 1,
-		Triangles	= 2,
-		RHT			= 3,
-	};
-	enum PrimitiveSize : uint8_t
-	{
-		Index16		= 1 << 4,	//	LdB-ECM says 16bit
-		XY32		= 3 << 4,	//	hackdriver says 16bit
-	};
+	BinControlProgram::PushTriangles( p, ShaderState_0, VertexDataPos, VERTEX_INDEXES, Frag_White );
+/*
+	BinControlProgram::PushTriangles( p, ShaderState_1, VERTEX_DATA, VERTEX_INDEXES, Frag_White );
 
+	BinControlProgram::PushTriangles( p, ShaderState_2, VertexDataPos, VERTEX_INDEXES, Frag_ColourToVaryings );
 	
+	BinControlProgram::PushTriangles( p, ShaderState_3, VertexDataPos, Frag_White );
 	
+	BinControlProgram::PushTriangles( p, ShaderState_4, VERTEX_DATA, Frag_White );
 	
+	BinControlProgram::PushTriangles( p, ShaderState_5, VertexDataPos, Frag_ColourToVaryings );
 	
-	//	Clip_Window - left, bottom, width, height
-	addbyte(&p, 102);
-	addshort(&p, 0 );
-	addshort(&p, 0 );
-	addshort(&p, mWidth );
-	addshort(&p, mHeight );
-
-	
-	//	state
-	//	Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
-	uint8_t Config[3];
-#define Clockwise	(1<<2)
-	Config[0] = Enable_Forward_Facing_Primitive | Enable_Reverse_Facing_Primitive;
-	Config[1] = DepthTestAlways;
-	Config[2] = 0;//EarlyDepthWrite;
-	addbyte(&p, 96);
-	addbyte(&p, Config[0]);
-	addbyte(&p, Config[1]);
-	addbyte(&p, Config[2]);
-	
-	//	wont render without
-	//	Viewport_Offset
-	addbyte(&p, 103);
-	addshort(&p, 0);
-	addshort(&p, 0);
-
-	for ( int i=0;	i<15;	i++ )
-	{
-		
-		uint8_t DataType = PrimitiveType::Triangles | (i<<4);
-		addbyte(&p, 56);
-		addbyte(&p, DataType);
-
-		
-		//	NV_Shader_State
-		addbyte(&p, 65);
-		auto* VertexShaderState = SetupVertexShaderState();
-		addword(&p, (uint32_t)VertexShaderState );
-		
-		//	macro Indexed_Primitive_List data, length, address, maxindex { ; Control ID Code: Indexed Primitive List (OpenGL)
-		uint8_t Mode = Mode_Triangles | Index_Type_8;
-		uint32_t IndexCount = VERTEX_COUNT;
-		uint32_t MaxIndex = IndexCount - 1;
-		addbyte(&p, 32);
-		addbyte(&p, Mode);
-		addword(&p, IndexCount);
-		addword(&p, (uint32_t)VERTEX_INDEXES_9 );
-		addword(&p, MaxIndex);
-	}
-	
+	BinControlProgram::PushTriangles( p, ShaderState_6, VERTEX_DATA, Frag_ColourToVaryings );
+	*/
 	
 
 	/*gr: stalls thread
@@ -704,10 +894,6 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	*/
 	
 	/*
-	 //	set primitive list format
-	 uint8_t DataType = PrimitiveType::Triangles | (3<<4);
-	 addbyte(&p, 56);
-	 addbyte(&p, 0x32);
 	
 	
 	
@@ -746,19 +932,7 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addword(&p, FirstIndex );
 	*/
 
-	
-#if defined(BINTHREAD_FLUSH)
-	addbyte(&p, 0x4);	//	flush
-#endif
-#if defined(BINTHREAD_FLUSHALL)
-	addbyte(&p, 0x5);	//	flush
-#endif
-#if defined(BINTHREAD_NOPHALT)
-	addbyte(&p, 1);	//	nop
-	addbyte(&p, 0);	//	halt
-#endif
-	
-	
+	BinControlProgram::Flush(p);
 	
 	
 	auto* ProgramMemoryEnd = p;
@@ -802,14 +976,10 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 
 uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory)
 {
-	//uint32_t ClearZMask = 0xffff;
-	//uint32_t ClearVGMask = 0xff;
-	//uint32_t ClearFlags0 = ClearZMask | (ClearVGMask<<24);
-	uint32_t ClearFlags0 = 0;
+	uint32_t ClearZMask = 0;
+	uint32_t ClearVGMask = 0;
+	uint32_t ClearFlags0 = ClearZMask | (ClearVGMask<<24);
 	uint8_t ClearStencil = 0;
-	//Clear_ZS      = $00FFFFFF ; Clear_Colors: Clear ZS (UINT24)
-	//Clear_VG_Mask = $FF000000 ; Clear_Colors: Clear VG Mask (UINT8)
-	//Clear_Stencil = $FF ; Clear_Colors: Clear Stencil (UINT8)
 	
 	addbyte( &Program, 114 );
 	//	gr: gotta do colour twice, or RGBA16

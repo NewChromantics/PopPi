@@ -423,8 +423,9 @@ void DrawScreen(TDisplay& Display,int Tick)
  }
  */
 
+#define TILE_BIN_PADDING	0
 
-uint8_t gTileBin[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin)]  __attribute__ ((aligned(16)));
+uint8_t gTileBin[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin) + TILE_BIN_PADDING]  __attribute__ ((aligned(16)));
 uint8_t gTileState[MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE]  __attribute__ ((aligned(16)));
 //static volatile uint32_t* TileBin = (uint32_t*)0x00400000;
 //static volatile uint8_t* TileState = (uint8_t*)00500000;
@@ -565,7 +566,7 @@ CAPI int notmain ( void )
 	
 	
 #else
-	TALLOCMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin), !USE_BIG_ALLOCATION );
+	TALLOCMemory TileBins( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_BIN_BLOCK_SIZE * sizeof(TTileBin) + TILE_BIN_PADDING, !USE_BIG_ALLOCATION );
 	DebugAlloc( TileBins, "Tile Bins" );
 
 	TALLOCMemory TileState( MAX_TILE_WIDTH*MAX_TILE_HEIGHT*TILE_STRUCT_SIZE, !USE_BIG_ALLOCATION );

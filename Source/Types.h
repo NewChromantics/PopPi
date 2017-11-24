@@ -47,7 +47,11 @@ public:
 };
 
 typedef TVector2<uint32_t> uint32_2;
+typedef TVector2<uint16_t> uint16_2;
 
+#define MaskBits(Value,Size)			( (Value) & ((1<<(Size))-1) )
+//#define Fixed12_4( Integer, Fraction )	( (MaskBits(Integer,12)<<4) | MaskBits(Fraction,4) )
+#define Fixed12_4( Integer, Fraction )	( Integer*16 )
 
 
 #if !defined(__EXCEPTIONS)

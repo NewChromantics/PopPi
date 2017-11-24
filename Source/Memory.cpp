@@ -162,3 +162,17 @@ bool TCpuMemory::Unlock()
 {
 	return true;
 }
+
+
+
+
+
+void TMappedMemory::Clear(uint8_t Value)
+{
+	for ( int i=0;	i<mSize;	i++ )
+	{
+		mLockedAddress[i] = Value;
+	}
+}
+
+
