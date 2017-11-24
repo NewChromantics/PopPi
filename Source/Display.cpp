@@ -495,7 +495,7 @@ void TDisplay::GpuNopTest()
 uint8_t NV_SHADER_STATE_RECORD[200]  __attribute__ ((aligned(16)));
 uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 {
-	
+	/*
 	//	hackdriver
 	0x958e0dbf,
 	0xd1724823,// mov r0, vary; mov r3.8d, 1.0
@@ -515,8 +515,7 @@ uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 	0x100009e7, // nop; nop; nop
 	0x009e7000,
 	0x500009e7, // nop; nop; sbdone
-/*
-	
+*/
 	//	Fill Color Shader
 	EndianSwap32( 0x009E7000 ),
 	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
@@ -533,7 +532,7 @@ uint32_t FRAGMENT_SHADER_CODE[] __attribute__ ((aligned(16)))=
 	EndianSwap32( 0x009E7000 ),
 	EndianSwap32( 0x100009E7 ),	//	nop; nop; nop
 	
-	*/
+	
 };
 
 struct TVertex
@@ -563,6 +562,29 @@ TVertex VERTEX_DATA[VERTEX_COUNT] __attribute__ ((aligned(16))) =
 	{	EndianSwap16(600 * 16),	EndianSwap16(600 * 16),	1,1, 	0,0,0	},
 };
 
+struct TVertexPos
+{
+	uint16_t	x;	//	12.4 Fixed Point
+	uint16_t	y;	//	12.4 Fixed Point
+	float		z;	//	float
+	float		w;	//	float
+};
+TVertexPos VertexDataPos[] __attribute__ ((aligned(16))) =
+{
+	{	EndianSwap16(1 * 16),	EndianSwap16(1 * 16),	1,1	},
+	{	EndianSwap16(100 * 16),	EndianSwap16(1 * 16),	1,1	},
+	{	EndianSwap16(100 * 16),	EndianSwap16(100 * 16),	1,1	},
+	
+	{	EndianSwap16(101 * 16),	EndianSwap16(110 * 16),	1,1	},
+	{	EndianSwap16(200 * 16),	EndianSwap16(150 * 16),	1,1	},
+	{	EndianSwap16(200 * 16),	EndianSwap16(200 * 16),	1,1	},
+	
+	{	EndianSwap16(4 * 16),	EndianSwap16(400 * 16),	1,1	},
+	{	EndianSwap16(550 * 16),	EndianSwap16(500 * 16),	1,1	},
+	{	EndianSwap16(600 * 16),	EndianSwap16(600 * 16),	1,1	},
+};
+
+
 uint8_t VERTEX_INDEXES[VERTEX_COUNT] __attribute__ ((aligned(16))) =
 {
 	0,1,2
@@ -583,13 +605,13 @@ uint8_t* SetupVertexShaderState()
 {
 	uint8_t* p = NV_SHADER_STATE_RECORD;
 	
-	addbyte(&p, 0x01);											// flags
-	addbyte(&p, 6 * 4);										// stride
-	addbyte(&p, 0xcc);											// num uniforms (not used)
-	addbyte(&p, 3);											// num varyings
+	addbyte(&p, 0);											// flags
+	addbyte(&p, sizeof(VertexDataPos[0]));										// stride
+	addbyte(&p, 0);											// num uniforms (not used)
+	addbyte(&p, 0);											// num varyings
 	addword(&p, (uint32_t)FRAGMENT_SHADER_CODE);			// Fragment shader code
-	addword(&p, (uint32_t)FragUniforms);			// Fragment shader uniforms
-	addword(&p, (uint32_t)VERTEX_DATA);
+	addword(&p, (uint32_t)0);			// Fragment shader uniforms
+	addword(&p, (uint32_t)VertexDataPos);
 	
 	/*
 	//	Flag Bits: 0 = Fragment Shader Is Single Threaded,
@@ -692,6 +714,8 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 #define Index_Type_8 					0x00	//	Indexed_Primitive_List: Index Type = 8-Bit
 #define Index_Type_16					0x10	//	Indexed_Primitive_List: Index Type = 16-Bit
 #define DepthTestDisabled				0x0
+#define DepthTestAlways					(7<<4)
+#define DepthTestNever					(0<<4)
 	
 	//	primitive list
 	enum PrimitiveType : uint8_t
@@ -708,10 +732,6 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	};
 
 	
-	//	set primitive list format
-	uint8_t DataType = PrimitiveType::Triangles | (3<<4);
-	addbyte(&p, 56);
-	addbyte(&p, 0x32);
 	
 	
 	
@@ -726,9 +746,10 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	//	state
 	//	Configuration_Bits Enable_Forward_Facing_Primitive + Enable_Reverse_Facing_Primitive, Early_Z_Updates_Enable ; Configuration Bits
 	uint8_t Config[3];
+#define Clockwise	(1<<2)
 	Config[0] = Enable_Forward_Facing_Primitive | Enable_Reverse_Facing_Primitive;
-	Config[1] = DepthTestDisabled;
-	Config[2] = EarlyDepthWrite;
+	Config[1] = DepthTestAlways;
+	Config[2] = 0;//EarlyDepthWrite;
 	addbyte(&p, 96);
 	addbyte(&p, Config[0]);
 	addbyte(&p, Config[1]);
@@ -740,6 +761,55 @@ bool TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_
 	addshort(&p, 0);
 	addshort(&p, 0);
 
+	for ( int i=0;	i<15;	i++ )
+	{
+		
+		uint8_t DataType = PrimitiveType::Triangles | (i<<4);
+		addbyte(&p, 56);
+		addbyte(&p, DataType);
+
+		
+		//	NV_Shader_State
+		addbyte(&p, 65);
+		auto* VertexShaderState = SetupVertexShaderState();
+		addword(&p, (uint32_t)VertexShaderState );
+		
+		//	macro Indexed_Primitive_List data, length, address, maxindex { ; Control ID Code: Indexed Primitive List (OpenGL)
+		uint8_t Mode = Mode_Triangles | Index_Type_8;
+		uint32_t IndexCount = VERTEX_COUNT;
+		uint32_t MaxIndex = IndexCount - 1;
+		addbyte(&p, 32);
+		addbyte(&p, Mode);
+		addword(&p, IndexCount);
+		addword(&p, (uint32_t)VERTEX_INDEXES_9 );
+		addword(&p, MaxIndex);
+	}
+	
+	
+
+	/*gr: stalls thread
+#define xy32(x,y)	( (x) | ((y)<<16) )
+	//	gr: try inline primitives
+	addbyte(&p, 42);
+	addbyte(&p, 4);	//	trianlge
+	addword(&p, xy32( 0, 0 ) );
+	addword(&p, xy32( 100, 0 ) );
+	addword(&p, xy32( 100, 100 ) );
+	
+	addword(&p, xy32( 0, 500 ) );
+	addword(&p, xy32( 500, 500 ) );
+	addword(&p, xy32( 0, 0 ) );
+	
+	addbyte(&p, 128 );	//	terminator(escape code)
+	*/
+	
+	/*
+	 //	set primitive list format
+	 uint8_t DataType = PrimitiveType::Triangles | (3<<4);
+	 addbyte(&p, 56);
+	 addbyte(&p, 0x32);
+	
+	
 	
 	//	primitive instance
 	//	No vertex shader (pre transformed verts)

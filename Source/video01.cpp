@@ -640,12 +640,13 @@ CAPI int notmain ( void )
 		DebugMemoryDump( TileBins, "Tile bins post render", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
 		DebugMemoryDump( TileState, "Tile State post render", Display, TILE_STRUCT_SIZE );
 	
-		//Abort=true;
 		if ( Abort )
 			return 1;
 
+		//if ( Tick == 0 )
+		//	TKernel::Sleep(500);
+
 		Tick++;
-		//TKernel::Sleep(100);
 	}
 
 
