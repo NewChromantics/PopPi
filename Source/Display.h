@@ -37,12 +37,10 @@ public:
 	void		GpuNopTest();
 	
 	//	returns program end
-	void*		SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory);
-	bool		ExecuteThread0(void* ProgramStart,void* ProgramEnd);
-
-	uint8_t*	SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory);
-	bool		SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory);
+	uint8_t*	SetupBinControl(uint8_t* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory);
+	uint8_t*	SetupRenderControl(uint8_t* Program,TTileBin* TileBinMemory);
 	
+	bool		ExecuteThread(uint8_t* ProgramStart,uint8_t* ProgramEnd,int Thread);
 
 	uint8_t		GetTileWidth() const	{	return (mWidth-(mWidth%64))/64;	}	//	round down so we don't overflow pixel buffer
 	uint8_t		GetTileHeight() const	{	return (mHeight-(mHeight%64))/64;	}	//	round down so we don't overflow pixel buffer

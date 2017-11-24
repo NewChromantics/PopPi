@@ -789,7 +789,7 @@ uint8_t ShaderState_5[200]  __attribute__ ((aligned(16)));
 uint8_t ShaderState_6[200]  __attribute__ ((aligned(16)));
 
 
-void* TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
+uint8_t* TDisplay::SetupBinControl(uint8_t* ProgramMemory,TTileBin* TileBinMemory,size_t TileBinMemorySize,void* TileStateMemory)
 {
 	//	CONTROL_LIST_BIN_STRUCT
 	auto* p = TKernel::GetPROGRAMMEMAddress((uint8_t*)ProgramMemory);
@@ -894,40 +894,77 @@ void* TDisplay::SetupBinControl(void* ProgramMemory,TTileBin* TileBinMemory,size
 	return ProgramMemoryEnd;
 }
 
-bool TDisplay::ExecuteThread0(void* ProgramStart,void* ProgramEnd)
+bool TDisplay::ExecuteThread(uint8_t* ProgramStart,uint8_t* ProgramEnd,int Thread)
 {
+	auto Register_Start = (Thread==0) ? V3D_CT0CA : V3D_CT1CA;
+	auto Register_End = (Thread==0) ? V3D_CT0EA : V3D_CT1EA;
+	auto Register_Status = (Thread==0) ? V3D_CT0CS : V3D_CT1CS;
+	
 #if defined(RESET_THREAD0)
 	{
 		//	reset thread...
-		auto Status = *GetV3dReg(V3D_CT0CS);
+		auto Status = *GetV3dReg(Register_Status);
 		Status |= 1<<15;
-		*GetV3dReg(V3D_CT0CS) = Status;
+		*GetV3dReg(Register_Status) = Status;
 	}
 #endif
 	
 #if defined(STOP_THREAD0)
 	{
 		//	stop thread...
-		auto Status = *GetV3dReg(V3D_CT0CS);
+		auto Status = *GetV3dReg(Register_Status);
 		Status |= (1<<5);
-		*GetV3dReg(V3D_CT0CS) = Status;
+		*GetV3dReg(Register_Status) = Status;
 	}
 #endif
 	
 	if ( !WaitForThread(0) )
 		return false;
 	
-	*GetV3dReg(V3D_CT0CA) = TKernel::GetTHREADAddress32(ProgramStart);
-	*GetV3dReg(V3D_CT0EA) = TKernel::GetTHREADAddress32(ProgramEnd);
+	*GetV3dReg(Register_Start) = TKernel::GetTHREADAddress32(ProgramStart);
+	*GetV3dReg(Register_End) = TKernel::GetTHREADAddress32(ProgramEnd);
 	
-	if ( !WaitForThread(0) )
-		return false;
+	
+	while ( true )
+	{
+		auto State = GetThreadState(Thread);
+		if ( State == Error )
+		{
+			auto ErrorStat = ReadV3dReg( V3D_ERRSTAT );
+			DrawString( GetConsoleX(), GetConsoleY(), "Thread Error=" );
+			DrawHex( GetConsoleX(false), GetConsoleY(), ErrorStat );
+			
+#if defined(RESET_THREAD_ON_ERROR)
+			//	reset thread...
+			auto Status = *GetV3dReg(V3D_CT1CS);
+			Status = 1<<15;
+			*GetV3dReg(Register_Status) = Status;
+#endif
+			return false;
+		}
+		
+		if ( State == Finished )
+			break;
+		
+		if ( State == Stalled )
+		{
+			DrawString( GetConsoleX(), GetConsoleY(), "thread stalled" );
+		}
+		else
+		{
+			//DrawString( GetConsoleX(), GetConsoleY(), "waiting for thread 1" );
+		}
+		//TKernel::Sleep(100);
+	}
+	
 	
 	return true;
 }
 
 
-uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinMemory)
+
+
+uint8_t* TDisplay::SetupRenderControl(uint8_t* Program,TTileBin* TileBinMemory)
 {
 	uint32_t ClearZMask = 0;
 	uint32_t ClearVGMask = 0;
@@ -1015,106 +1052,6 @@ uint8_t* TDisplay::SetupRenderControlProgram(uint8_t* Program,TTileBin* TileBinM
 }
 
 
-bool TDisplay::SetupRenderControl(void* ProgramMemory,TTileBin* TileBinMemory)
-{
-	auto* ProgramMemoryEnd = SetupRenderControlProgram( TKernel::GetCpuAddress((uint8_t*)ProgramMemory), TileBinMemory );
-	
-	auto Length = (int)ProgramMemoryEnd - (int)ProgramMemory;
-	if ( Length == 0 )
-	{
-		DrawString( GetConsoleX(), GetConsoleY(), "thread 1 program length zero" );
-		return false;
-	}
-	
-#if defined(RESET_THREAD1)
-	{
-		//	reset thread...
-		auto Status = *GetV3dReg(V3D_CT1CS);
-		Status |= 1<<15;
-		*GetV3dReg(V3D_CT1CS) = Status;
-	}
-#endif
-	
-#if defined(STOP_THREAD1)
-	{
-		//	stop thread...
-		auto Status = *GetV3dReg(V3D_CT1CS);
-		Status |= (1<<5);
-		*GetV3dReg(V3D_CT1CS) = Status;
-	}
-#endif
-	auto Thread = 1;
-	
-	
-	if ( !WaitForThread(Thread) )
-	{
-		//	gr: none of these resets are getting rid of the error
-		DrawString( GetConsoleX(), GetConsoleY(), "thread 1 pre wait failed" );
-		auto ErrorStat = ReadV3dReg( V3D_ERRSTAT );
-		DrawString( GetConsoleX(), GetConsoleY(), "Thread1 Error=" );
-		DrawHex( GetConsoleX(false), GetConsoleY(), ErrorStat );
-
-		
-#if defined(STOP_THREAD_ON_ERROR)
-		{
-			//	stop thread...
-			auto Status = *GetV3dReg(V3D_CT1CS);
-			Status |= (1<<5);
-			*GetV3dReg(V3D_CT1CS) = Status;
-		 }
-#endif
-#if defined(RESET_THREAD_ON_ERROR)
-		{
-			//	reset thread...
-			auto Status = *GetV3dReg(V3D_CT1CS);
-			Status = 1<<15;
-			*GetV3dReg(V3D_CT1CS) = Status;
-		}
-#endif
-		 return false;
-	}
-	
-
-	*GetV3dReg(V3D_CT1CA) = TKernel::GetTHREADAddress32(ProgramMemory);
-	*GetV3dReg(V3D_CT1EA) = TKernel::GetTHREADAddress32(ProgramMemoryEnd);
-	
-	while ( true )
-	{
-		auto State = GetThreadState(Thread);
-		if ( State == Error )
-		{
-			auto ErrorStat = ReadV3dReg( V3D_ERRSTAT );
-			DrawString( GetConsoleX(), GetConsoleY(), "Thread1 Error=" );
-			DrawHex( GetConsoleX(false), GetConsoleY(), ErrorStat );
-			
-#if defined(RESET_THREAD_ON_ERROR)
-			//	reset thread...
-			auto Status = *GetV3dReg(V3D_CT1CS);
-			Status = 1<<15;
-			*GetV3dReg(V3D_CT1CS) = Status;
-#endif
-			return false;
-		}
-		
-		if ( State == Finished )
-			break;
-		
-		if ( State == Stalled )
-		{
-			DrawString( GetConsoleX(), GetConsoleY(), "thread 1 stalled" );
-		}
-		else
-		{
-			//DrawString( GetConsoleX(), GetConsoleY(), "waiting for thread 1" );
-		}
-		//TKernel::Sleep(100);
-	}
-	
-	//	explicit stop
-	//*GetV3dReg(V3D_CT1CS) = 0x20;
-	
-	return true;
-}
 
 
 

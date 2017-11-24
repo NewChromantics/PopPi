@@ -601,7 +601,8 @@ CAPI int notmain ( void )
 	auto* Program1Mem = Program1.GetBUFFERAddress();
 #endif
 	
-	void* Program0End = Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem );
+	auto* Program0End = Display.SetupBinControl( Program0Mem, TileBinMem, TileBins.GetSize(), TileStateMem );
+	auto* Program1End = Display.SetupRenderControl( Program1Mem, TileBinMem );
 
 	
 	
@@ -618,43 +619,34 @@ CAPI int notmain ( void )
 		//Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
 		Display.mClearColour = RGBA( Tick%255, (Tick/10)%255, (Tick/100)%255, 255 );
 		
-		if ( !Display.ExecuteThread0( Program0Mem, Program0End ) )
-		{
-			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl failed");
-			TKernel::Sleep(10);
-		}
-		else
-		{
-			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupBinControl success");
-		}
+		//	gr: this works
+		//	poke colour
+		Program1Mem[1] = Tick%255;
+		Program1Mem[2] = Tick%255;
+		Program1Mem[3] = Tick%255;
+		Program1Mem[4] = 0;
+		Program1Mem[5] = Tick%255;
+		Program1Mem[6] = Tick%255;
+		Program1Mem[7] = Tick%255;
+		//	this doesnt work
+		auto* Colours = (uint32_t*)(&Program1Mem[1]);
+		//Colours[0] = Display.mClearColour;
+		//Colours[1] = Display.mClearColour;
 
-		DebugMemoryDump( TileBins, "Tile bins", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
-		DebugMemoryDump( TileState, "Tile State", Display, TILE_STRUCT_SIZE );
-#if USE_BIG_ALLOCATION==true
-		DebugMemoryDump( BigAlloc, "BigAlloc", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
-#endif
 		
-		bool Abort = false;
-		//	gr this actually draws...
-		if ( !Display.SetupRenderControl( Program1Mem, TileBinMem) )
+		if ( !Display.ExecuteThread( Program0Mem, Program0End, 0 ) )
 		{
-			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl failed");
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Bin thread failed");
 			TKernel::Sleep(10);
-			Abort = true;
 		}
-		else
+
+		if ( !Display.ExecuteThread( Program1Mem, Program1End, 1 ) )
 		{
-			//Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "SetupRenderControl success");
+			Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Render thread failed");
+			TKernel::Sleep(10);
 		}
-		DebugMemoryDump( TileBins, "Tile bins post render", Display, TILE_BIN_BLOCK_SIZE*sizeof(TTileBin) );
-		DebugMemoryDump( TileState, "Tile State post render", Display, TILE_STRUCT_SIZE );
-	
-		if ( Abort )
-			return 1;
 
-		//if ( Tick == 0 )
-		//	TKernel::Sleep(500);
-
+		
 		Tick++;
 	}
 
