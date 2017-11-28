@@ -11,6 +11,7 @@ PROJECTNAME = PopPi
 
 COPS = -Wall -O2 -nostdlib -nostartfiles -ffreestanding 
 CPPOPS = -Wall -O2 -std=c++11 -nostdlib -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions -fno-rtti
+QPUASMOPS = --exportentry=false
 
 LINKOPS = -L$(ARMLIBPATH) -lgcc 
 #-lfplib
@@ -19,6 +20,7 @@ LINKOPS = -L$(ARMLIBPATH) -lgcc
 COBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 CPPOBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 SOBJECTS = $(patsubst %.s, %.o, $(wildcard *.s))
+QPUOBJECTS = $(patsubst %.qpuasm, %.qpuasm.h, $(wildcard *.qpuasm))
 
 rebuildandupload : rebuild
 	@echo Uploading...
@@ -38,7 +40,13 @@ clean :
 	rm -f *.img
 	rm -f *.bc
 	rm -f *.clang.s
+	rm -f *.qpuasm.h
 
+%.qpuasm.h : %.qpuasm
+	@echo compiling $< qpu assembler to $@
+
+
+	node Videocoreiv-qpu/qpu-tutorial/qpuasm.js $(QPUASMOPS) --exportarray=$* --in $< > $@
 
 %.o : %.s
 	@echo compiling as $<
@@ -53,7 +61,8 @@ clean :
 	$(ARMGNU)g++ $(CPPOPS) -c $< -o $@
 
 
-$(TARGET) : loader $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS)
+$(TARGET) : loader $(QPUOBJECTS) $(SOBJECTS) $(COBJECTS) $(CPPOBJECTS)
+	@echo $(QPUOBJECTS)
 	@echo $(SOBJECTS)
 	@echo $(COBJECTS)
 	@echo $(CPPOBJECTS)

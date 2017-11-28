@@ -585,7 +585,7 @@ CAPI int notmain ( void )
 #endif
 #endif
 
-	bool DrawTick = true;
+	int DrawTickFrequency = 100;
 	
 	
 	
@@ -610,15 +610,20 @@ CAPI int notmain ( void )
 	while ( true )
 	{
 
-		if ( DrawTick )
+		if ( DrawTickFrequency > 0 )
 		{
-			Display.DrawString( Display.GetConsoleX(), Display.mHeight-9, "Tick ");
-			Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
+			if ( Tick % DrawTickFrequency == 0  )
+			{
+				Display.DrawString( Display.GetConsoleX(), Display.mHeight-9, "Tick ");
+				Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
+			}
 		}
 		
 		//Display.mClearColour = RGBA( (Tick&1) * 255, 0, 255, 255 );
 		Display.mClearColour = RGBA( Tick%255, (Tick/10)%255, (Tick/100)%255, 255 );
 		
+		Program1End = Display.SetupRenderControl( Program1Mem, TileBinMem );
+/*
 		//	gr: this works
 		//	poke colour
 		Program1Mem[1] = Tick%255;
@@ -632,7 +637,7 @@ CAPI int notmain ( void )
 		auto* Colours = (uint32_t*)(&Program1Mem[1]);
 		//Colours[0] = Display.mClearColour;
 		//Colours[1] = Display.mClearColour;
-
+*/
 		
 		if ( !Display.ExecuteThread( Program0Mem, Program0End, 0 ) )
 		{

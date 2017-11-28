@@ -392,8 +392,14 @@ void TDisplay::GpuNopTest()
  uint8_t gProgram1[4096*4]  __attribute__ ((aligned(16)));
 	*/
 
+#include "Frag_Colours.qpuasm.h"
+/*
 uint32_t Frag_ColourToVaryings[] __attribute__ ((aligned(16)))=
 {
+	//	https://github.com/hermanhermitage/videocoreiv-qpu
+	//	I'm realigning the names with those found in some of the blobs. For instance thread-switch
+ 	//	becomes thrsw, gl_FragColor becomes tlbc, min8 becomes v8min and so forth.
+
 	//	hackdriver
 	0x958e0dbf,
 	0xd1724823,// mov r0, vary; mov r3.8d, 1.0
@@ -414,24 +420,36 @@ uint32_t Frag_ColourToVaryings[] __attribute__ ((aligned(16)))=
 	0x009e7000,
 	0x500009e7, // nop; nop; sbdone
 };
+*/
 
-
-uint32_t Frag_White[] __attribute__ ((aligned(16)))=
+const uint32_t Frag_White[] __attribute__ ((aligned(16)))=
 {
+	
 	0x009E7000,
 	0x100009E7,	//	nop; nop; nop
-	
-	0xFFFFFFFF,	//	RGBA White
-	0xE0020BA7,	//	ldi tlbc, $FFFFFFFF
 	0x009E7000,
-	0x500009E7,	//	nop; nop; sbdone
+	0x100009E7,	//	nop; nop; nop
+
+	0xFFFF8010,	//	ARGB White
+	0xE0020BA7,	//	ldi tlbc, $FFFFFFFF
+	
+	0x009E7000,
+	0x100009E7,	//	nop; nop; nop
+	0x009E7000,
+	0x100009E7,	//	nop; nop; nop
+
 	0x009E7000,
 	0x300009E7,	//	nop; nop; thrend
+
+	0x009E7000,
+	0x500009E7,	//	nop; nop; sbdone
+
 	
 	0x009E7000,
 	0x100009E7,	//	nop; nop; nop
 	0x009E7000,
 	0x100009E7,	//	nop; nop; nop
+
 };
 
 
@@ -827,7 +845,10 @@ uint8_t* TDisplay::SetupBinControl(uint8_t* ProgramMemory,TTileBin* TileBinMemor
 	//BinControlProgram::PushTriangles( p, ShaderState_3, VertexDataPos, Frag_White );
 	//BinControlProgram::PushTriangles( p, ShaderState_4, VertexAndColours, Frag_White );
 	//BinControlProgram::PushTriangles( p, ShaderState_5, VertexDataPos, Frag_ColourToVaryings );
-	BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_ColourToVaryings );
+	
+	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_ColourToVaryings );
+	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_White );
+	BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_Colours );
 	
 	
 
