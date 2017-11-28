@@ -4,7 +4,9 @@
 #include "Memory.h"
 
 #include "Frag_Colours.qpuasm.h"
+#include "Frag_Rgb.qpuasm.h"
 #include "Frag_Uv.qpuasm.h"
+#include "Frag_UvTick.qpuasm.h"
 
 #define ENABLE_TRIANGLES
 
@@ -455,7 +457,7 @@ const uint32_t Frag_White[] __attribute__ ((aligned(16)))=
 };
 
 
-struct TVertex_PosColour
+struct TVertex_PosRgb
 {
 	uint16_t		x;	//	12.4 Fixed Point
 	uint16_t		y;	//	12.4 Fixed Point
@@ -478,13 +480,26 @@ struct TVertex_PosUv
 };
 
 
-#define LEFT	100
-#define TOP		100
-#define	RIGHT	500
-#define BOTTOM	500
+struct TVertex_PosUvTick
+{
+	uint16_t		x;	//	12.4 Fixed Point
+	uint16_t		y;	//	12.4 Fixed Point
+	float		z;
+	float		w;
+	float		u;
+	float		v;
+	float		Tick;
+};
 
 
-TVertex_PosUv QuadVertexes[] __attribute__ ((aligned(16))) =
+#define	RIGHT	(LEFT+WIDTH)
+#define BOTTOM	(TOP+HEIGHT)
+#define	WIDTH	200
+#define HEIGHT	200
+
+#define LEFT	50
+#define TOP		50
+TVertex_PosUv Quad_Uv[] __attribute__ ((aligned(16))) =
 {
 	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	0,0	},
 	{	Fixed12_4( LEFT,0),		Fixed12_4(BOTTOM,0),	1,1,	0,1	},
@@ -495,7 +510,12 @@ TVertex_PosUv QuadVertexes[] __attribute__ ((aligned(16))) =
 	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	0,0	},
 };
 
-TVertex_PosColour VertexAndColours[] __attribute__ ((aligned(16))) =
+
+#undef LEFT
+#undef TOP
+#define LEFT	300
+#define TOP		300
+TVertex_PosRgb Quad_Rgb[] __attribute__ ((aligned(16))) =
 {
 	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	1,0,0	},
 	{	Fixed12_4( LEFT,0),		Fixed12_4(BOTTOM,0),	1,1,	0,1,0	},
@@ -505,6 +525,33 @@ TVertex_PosColour VertexAndColours[] __attribute__ ((aligned(16))) =
 	{	Fixed12_4( RIGHT,0),	Fixed12_4(TOP,0),		1,1,	0,1,1	},
 	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	1,0,1	},
 };
+
+#undef LEFT
+#undef TOP
+#define LEFT	300
+#define TOP		50
+TVertex_PosUvTick Quad_UvTick[] __attribute__ ((aligned(16))) =
+{
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	1,0,	0.5f	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(BOTTOM,0),	1,1,	0,1,	0.5f	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1,	0,0,	0.5f	},
+	
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1,	1,1,	0.5f	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(TOP,0),		1,1,	0,1,	0.5f	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	1,0,	0.5f	},
+};
+
+
+#define lengthof(array)	( sizeof(array) / sizeof((array)[0]) )
+
+void SetTick(uint32_t Tick)
+{
+	float Tickf = Tick % 1000;
+	for ( int i=0;	i<lengthof(Quad_UvTick);	i++ )
+	{
+		Quad_UvTick[i].Tick = Tickf;
+	}
+}
 
 //	PSE not PTB
 struct TVertexPos
@@ -880,7 +927,9 @@ uint8_t* TDisplay::SetupBinControl(uint8_t* ProgramMemory,TTileBin* TileBinMemor
 	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_ColourToVaryings );
 	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_White );
 	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_Colours );
-	BinControlProgram::PushTriangles( p, ShaderState_6, QuadVertexes, Frag_Uv );
+	BinControlProgram::PushTriangles( p, ShaderState_0, Quad_Uv, Frag_Uv );
+	BinControlProgram::PushTriangles( p, ShaderState_1, Quad_Rgb, Frag_Rgb );
+	BinControlProgram::PushTriangles( p, ShaderState_2, Quad_UvTick, Frag_UvTick );
 	
 
 	/*gr: stalls thread

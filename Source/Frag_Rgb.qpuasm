@@ -2,24 +2,28 @@
 
 /*
 varyings;
-float u;
-float v;
+float r;
+float g;
+float b;
 */
 entry:
 # r0 as target colour (bgra!)
-# r1 as u
-# r2 as v
+# r1 as r
+# r2 as g
+# r3 as b
 
 # load uv. r5 is some kinda special accumulator. Gotta add together to make second triangle work :/
 mov r1, vary; nop
 fadd r1, r1, r5; nop
 mov r2, vary; nop
 fadd r2, r2, r5; nop
+mov r3, vary; nop
+fadd r3, r3, r5; nop
 
 # rgba = uv01
 nop; mov r0.8c, r1
 nop; mov r0.8b, r2
-nop; mov r0.8a, 0.0
+nop; mov r0.8a, r3
 nop; mov r0.8d, 1.0
 
 nop; nop

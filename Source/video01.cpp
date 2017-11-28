@@ -433,6 +433,7 @@ uint8_t gProgram0[0x1000]  __attribute__ ((aligned(4)));
 uint8_t gProgram1[0x1000]  __attribute__ ((aligned(4)));
 
 
+extern void SetTick(uint32_t Tick);
 
 CAPI int notmain ( void )
 {
@@ -610,6 +611,8 @@ CAPI int notmain ( void )
 	while ( true )
 	{
 
+		SetTick(Tick);
+		
 		if ( DrawTickFrequency > 0 )
 		{
 			if ( Tick % DrawTickFrequency == 0  )

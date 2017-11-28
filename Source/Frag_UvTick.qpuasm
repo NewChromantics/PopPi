@@ -1,14 +1,10 @@
 .global entry
 
-/*
-varyings;
-float u;
-float v;
-*/
 entry:
 # r0 as target colour (bgra!)
 # r1 as u
 # r2 as v
+# r3 at tick
 
 # load uv. r5 is some kinda special accumulator. Gotta add together to make second triangle work :/
 mov r1, vary; nop
@@ -16,25 +12,26 @@ fadd r1, r1, r5; nop
 mov r2, vary; nop
 fadd r2, r2, r5; nop
 
+# tick
+mov r3, vary; nop
+fadd r3, r3, r5; nop
+
+# tick/1000 to normalise
+#mov r0, 0.0
+#fadd r0, r0, 0.01f
+
 # rgba = uv01
 nop; mov r0.8c, r1
 nop; mov r0.8b, r2
-nop; mov r0.8a, 0.0
+nop; mov r0.8a, r3
 nop; mov r0.8d, 1.0
 
 nop; nop
 
-# signal we want to use tile
 nop; nop; sbwait
 nop; nop
-
-# write output colour (straight to tile buffer?)
-mov tlbc, r0; nop
-
-# signal end of thread
+mov tlbc, r0; nop             # write pixel colour to tile buffer; signal end of thread
 nop; nop; thrend
 nop; nop
-
-# signal we're done with tile buffer
-nop; nop; sbdone
+nop; nop; sbdone                      # Signal that we are finished with tile buffer
 nop; nop
