@@ -3,6 +3,9 @@
 #include "Mailbox.h"
 #include "Memory.h"
 
+#include "Frag_Colours.qpuasm.h"
+#include "Frag_Uv.qpuasm.h"
+
 #define ENABLE_TRIANGLES
 
 //	gr: if I don't stop thread 0, it hangs after 22 iterations
@@ -392,7 +395,6 @@ void TDisplay::GpuNopTest()
  uint8_t gProgram1[4096*4]  __attribute__ ((aligned(16)));
 	*/
 
-#include "Frag_Colours.qpuasm.h"
 /*
 uint32_t Frag_ColourToVaryings[] __attribute__ ((aligned(16)))=
 {
@@ -453,8 +455,7 @@ const uint32_t Frag_White[] __attribute__ ((aligned(16)))=
 };
 
 
-//	PSE not PTB
-struct TVertexAndColour
+struct TVertex_PosColour
 {
 	uint16_t		x;	//	12.4 Fixed Point
 	uint16_t		y;	//	12.4 Fixed Point
@@ -463,19 +464,38 @@ struct TVertexAndColour
 	float		r;
 	float		g;
 	float		b;
-	
-	//	gr: this is always (size/32bit)-(3xyz)
-	static uint8_t		GetVaryingsCount()	{	return 3;	}
 };
 
 
-#define LEFT	1
-#define TOP		1
+struct TVertex_PosUv
+{
+	uint16_t		x;	//	12.4 Fixed Point
+	uint16_t		y;	//	12.4 Fixed Point
+	float		z;
+	float		w;
+	float		u;
+	float		v;
+};
+
+
+#define LEFT	100
+#define TOP		100
 #define	RIGHT	500
 #define BOTTOM	500
 
 
-TVertexAndColour VertexAndColours[] __attribute__ ((aligned(16))) =
+TVertex_PosUv QuadVertexes[] __attribute__ ((aligned(16))) =
+{
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	0,0	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(BOTTOM,0),	1,1,	0,1	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1,	1,1	},
+	
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(BOTTOM,0),	1,1,	1,1	},
+	{	Fixed12_4( RIGHT,0),	Fixed12_4(TOP,0),		1,1,	1,0	},
+	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	0,0	},
+};
+
+TVertex_PosColour VertexAndColours[] __attribute__ ((aligned(16))) =
 {
 	{	Fixed12_4( LEFT,0),		Fixed12_4(TOP,0),		1,1,	1,0,0	},
 	{	Fixed12_4( LEFT,0),		Fixed12_4(BOTTOM,0),	1,1,	0,1,0	},
@@ -493,8 +513,6 @@ struct TVertexPos
 	uint16_t	y;	//	12.4 Fixed Point
 	float		z;	//	float
 	float		w;	//	float
-	
-	static uint8_t		GetVaryingsCount()	{	return 0;	}
 };
 
 TVertexPos VertexDataPos[] __attribute__ ((aligned(16))) =
@@ -735,6 +753,14 @@ void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVE
 	addword(&Program, (uint32_t)Indexes );
 	addword(&Program, MaxIndex );
 
+
+	
+	//	varyings count is base size + every float
+	static_assert( (sizeof(TVERTEX) % sizeof(float) ) == 0, "vertex needs to align to u32/float");
+	auto BaseSize = sizeof(float) * 3;	//	xy,z,w
+	auto VaryingSize = sizeof(TVERTEX) - BaseSize;
+	auto VaryingCount = VaryingSize / sizeof(float);
+
 	
 	//	setup state
 	uint8_t StateFlags = 0;
@@ -745,7 +771,7 @@ void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVE
 	addbyte(&ShaderState, StateFlags);					// flags
 	addbyte(&ShaderState, sizeof(TVERTEX) );	// stride
 	addbyte(&ShaderState, 0);					// num uniforms (not used)
-	addbyte(&ShaderState, TVERTEX::GetVaryingsCount() );	// num varyings
+	addbyte(&ShaderState, VaryingCount );	// num varyings
 	addword(&ShaderState, (uint32_t)FragShader);	// pointer to fragment shader code
 	addword(&ShaderState, (uint32_t)0);				// pointer to Fragment shader uniforms
 	addword(&ShaderState, (uint32_t)Vertexes);	//	pointer to vertex data
@@ -778,6 +804,11 @@ void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVE
 	addword(&Program, VERTEXCOUNT );
 	addword(&Program, FirstIndex );
 	
+	//	varyings count is base size + every float
+	static_assert( (sizeof(TVERTEX) % sizeof(float) ) == 0, "vertex needs to align to u32/float");
+	auto BaseSize = sizeof(float) * 3;	//	xy,z,w
+	auto VaryingSize = sizeof(TVERTEX) - BaseSize;
+	auto VaryingCount = VaryingSize / sizeof(float);
 	
 	//	setup state
 	uint8_t StateFlags = 0;
@@ -788,7 +819,7 @@ void BinControlProgram::PushTriangles(uint8_t*& Program,uint8_t* ShaderState,TVE
 	addbyte(&ShaderState, StateFlags);					// flags
 	addbyte(&ShaderState, sizeof(TVERTEX) );	// stride
 	addbyte(&ShaderState, 0);					// num uniforms (not used)
-	addbyte(&ShaderState, TVERTEX::GetVaryingsCount() );	// num varyings
+	addbyte(&ShaderState, VaryingCount );	// num varyings
 	addword(&ShaderState, (uint32_t)FragShader);	// pointer to fragment shader code
 	addword(&ShaderState, (uint32_t)0);				// pointer to Fragment shader uniforms
 	addword(&ShaderState, (uint32_t)Vertexes);	//	pointer to vertex data
@@ -848,8 +879,8 @@ uint8_t* TDisplay::SetupBinControl(uint8_t* ProgramMemory,TTileBin* TileBinMemor
 	
 	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_ColourToVaryings );
 	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_White );
-	BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_Colours );
-	
+	//BinControlProgram::PushTriangles( p, ShaderState_6, VertexAndColours, Frag_Colours );
+	BinControlProgram::PushTriangles( p, ShaderState_6, QuadVertexes, Frag_Uv );
 	
 
 	/*gr: stalls thread

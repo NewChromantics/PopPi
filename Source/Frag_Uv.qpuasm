@@ -1,0 +1,11 @@
+.global entry
+
+entry:
+nop; mov r3.8a, 0.0
+nop; mov r3.8b, 0.0
+nop; mov r3.8c, 1.0
+nop; mov r3.8d, 1.0
+nop; nop; sbwait
+mov tlbc, r3; nop             # write pixel colour to tile buffer; signal end of thread
+nop; nop; thrend
+nop; nop; sbdone                      # Signal that we are finished with tile buffer
