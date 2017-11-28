@@ -5,3 +5,7 @@
 *.list
 
 xcuserdata/
+
+# ignore compiled qpu assembler
+*.qpuasm.h
+
