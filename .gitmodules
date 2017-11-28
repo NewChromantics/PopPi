@@ -1,3 +1,6 @@
 [submodule "Source/HackDriver"]
 	path = Source/HackDriver
 	url = https://github.com/phire/hackdriver.git
+[submodule "Source/Videocoreiv-qpu"]
+	path = Source/Videocoreiv-qpu
+	url = https://github.com/NewChromantics/qpu-asm.git
