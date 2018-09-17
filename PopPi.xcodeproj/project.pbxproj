@@ -18,9 +18,9 @@
 		BF5EC01F1FC70CD1002ABF16 /* Display.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Display.h; path = Source/Display.h; sourceTree = "<group>"; };
 		BF5EC0201FC70EE8002ABF16 /* Mailbox.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Mailbox.cpp; path = Source/Mailbox.cpp; sourceTree = "<group>"; };
 		BF5EC0211FC70EF3002ABF16 /* Mailbox.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Mailbox.h; path = Source/Mailbox.h; sourceTree = "<group>"; };
-		BF5EC0221FC73F02002ABF16 /* WorkingVideo01.cxx */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = WorkingVideo01.cxx; path = Source/WorkingVideo01.cxx; sourceTree = "<group>"; };
 		BF5EC0231FC85750002ABF16 /* Memory.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Memory.cpp; path = Source/Memory.cpp; sourceTree = "<group>"; };
 		BF5EC0241FC85750002ABF16 /* Memory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Memory.h; path = Source/Memory.h; sourceTree = "<group>"; };
+		BF5EC0251FC9F463002ABF16 /* Red.frag */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.glsl; name = Red.frag; path = Source/Red.frag; sourceTree = "<group>"; };
 		BF7026D41FBDE7D600354F35 /* periph.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = periph.c; path = Source/periph.c; sourceTree = "<group>"; };
 		BF7026D51FBDE7D600354F35 /* vectors.s */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; name = vectors.s; path = Source/vectors.s; sourceTree = "<group>"; };
 		BF7026D61FBDE7D600354F35 /* video01.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = video01.cpp; path = Source/video01.cpp; sourceTree = "<group>"; };
@@ -33,6 +33,15 @@
 		BF7026E01FC101E900354F35 /* R_PI.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = R_PI.INC; path = asm/LIB/R_PI.INC; sourceTree = "<group>"; };
 		BF7026E11FC101E900354F35 /* R_PI2.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = R_PI2.INC; path = asm/LIB/R_PI2.INC; sourceTree = "<group>"; };
 		BF7026E21FC101E900354F35 /* V3D.INC */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; name = V3D.INC; path = asm/LIB/V3D.INC; sourceTree = "<group>"; };
+		BF71CDEB1FCDEBCA0084D367 /* Frag_Colours.qpuasm */ = {isa = PBXFileReference; lastKnownFileType = text; name = Frag_Colours.qpuasm; path = Source/Frag_Colours.qpuasm; sourceTree = "<group>"; };
+		BF71CDEC1FCDEC3B0084D367 /* Frag_Colours.qpuasm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Frag_Colours.qpuasm.h; path = Source/Frag_Colours.qpuasm.h; sourceTree = "<group>"; };
+		BF71CDEE1FCDF7DD0084D367 /* qpuasm.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = qpuasm.js; path = "Source/Videocoreiv-qpu/qpu-tutorial/qpuasm.js"; sourceTree = "<group>"; };
+		BF71CDEF1FCDFE9B0084D367 /* Frag_Uv.qpuasm */ = {isa = PBXFileReference; lastKnownFileType = text; name = Frag_Uv.qpuasm; path = Source/Frag_Uv.qpuasm; sourceTree = "<group>"; };
+		BF71CDF01FCDFED40084D367 /* Frag_Uv.qpuasm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Frag_Uv.qpuasm.h; path = Source/Frag_Uv.qpuasm.h; sourceTree = "<group>"; };
+		BF71CDF11FCE23F00084D367 /* Frag_Rgb.qpuasm */ = {isa = PBXFileReference; lastKnownFileType = text; name = Frag_Rgb.qpuasm; path = Source/Frag_Rgb.qpuasm; sourceTree = "<group>"; };
+		BF71CDF21FCE26800084D367 /* Frag_UvTick.qpuasm */ = {isa = PBXFileReference; lastKnownFileType = text; name = Frag_UvTick.qpuasm; path = Source/Frag_UvTick.qpuasm; sourceTree = "<group>"; };
+		BF71CDF31FCE26D20084D367 /* Frag_UvTick.qpuasm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Frag_UvTick.qpuasm.h; path = Source/Frag_UvTick.qpuasm.h; sourceTree = "<group>"; };
+		BF71CDF41FCE26DE0084D367 /* Frag_Rgb.qpuasm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Frag_Rgb.qpuasm.h; path = Source/Frag_Rgb.qpuasm.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -55,16 +64,33 @@
 				BF5EC01F1FC70CD1002ABF16 /* Display.h */,
 				BF5EC0201FC70EE8002ABF16 /* Mailbox.cpp */,
 				BF5EC0211FC70EF3002ABF16 /* Mailbox.h */,
-				BF5EC0221FC73F02002ABF16 /* WorkingVideo01.cxx */,
 				BF5EC0231FC85750002ABF16 /* Memory.cpp */,
 				BF5EC0241FC85750002ABF16 /* Memory.h */,
+				BF5EC0251FC9F463002ABF16 /* Red.frag */,
+				BF71CDEB1FCDEBCA0084D367 /* Frag_Colours.qpuasm */,
+				BF71CDEC1FCDEC3B0084D367 /* Frag_Colours.qpuasm.h */,
+				BF71CDEF1FCDFE9B0084D367 /* Frag_Uv.qpuasm */,
+				BF71CDF01FCDFED40084D367 /* Frag_Uv.qpuasm.h */,
+				BF71CDF11FCE23F00084D367 /* Frag_Rgb.qpuasm */,
+				BF71CDF41FCE26DE0084D367 /* Frag_Rgb.qpuasm.h */,
+				BF71CDF21FCE26800084D367 /* Frag_UvTick.qpuasm */,
+				BF71CDF31FCE26D20084D367 /* Frag_UvTick.qpuasm.h */,
 			);
 			name = Source;
+			sourceTree = "<group>";
+		};
+		BF71CDED1FCDF7D20084D367 /* QpuAssembler */ = {
+			isa = PBXGroup;
+			children = (
+				BF71CDEE1FCDF7DD0084D367 /* qpuasm.js */,
+			);
+			name = QpuAssembler;
 			sourceTree = "<group>";
 		};
 		BFD306331FBDE78700F650B6 = {
 			isa = PBXGroup;
 			children = (
+				BF71CDED1FCDF7D20084D367 /* QpuAssembler */,
 				BF7026DD1FC1016400354F35 /* kernel.asm */,
 				BF7026DE1FC101E900354F35 /* CONTROL_LIST.INC */,
 				BF7026DF1FC101E900354F35 /* FASMARM.INC */,

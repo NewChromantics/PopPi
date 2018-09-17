@@ -38,6 +38,7 @@ FB_Init:
   and r0,$3FFFFFFF ; Convert Mail Box Frame Buffer Pointer From BUS Address To Physical Address ($CXXXXXXX -> $3XXXXXXX)
   str r0,[FB_POINTER] ; Store Frame Buffer Pointer Physical Address
 
+//	gr: copy framebuffer address into TILE_MODE_ADDRESS data (offset=addr)
 imm32 r1,TILE_MODE_ADDRESS + 1 ; Store Frame Buffer Pointer To Control List Tile Rendering Mode Configuration Memory Address
 strb r0,[r1],1
 lsr r0,8

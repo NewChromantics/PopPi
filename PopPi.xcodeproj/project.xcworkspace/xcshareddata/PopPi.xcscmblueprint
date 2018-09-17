@@ -4,18 +4,32 @@
 
   },
   "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "1DAA7F96BA3F4D9BA3429FA3345F547E0B82738A" : 9223372036854775807,
     "CB2FDE39E7388313AE340DFFF4425625E83732A5" : 9223372036854775807,
+    "AEC780B3BA0C34CA27C5751DB1075858FD60F54C" : 9223372036854775807,
     "DC68E02BF158588759BD0B643A3FD70C0B65AC18" : 9223372036854775807
   },
   "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "B3DCB92E-EECE-4A96-B214-A4DB5AD980A8",
   "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "1DAA7F96BA3F4D9BA3429FA3345F547E0B82738A" : "qpu-asm\/",
     "CB2FDE39E7388313AE340DFFF4425625E83732A5" : "PopPi\/",
+    "AEC780B3BA0C34CA27C5751DB1075858FD60F54C" : "PopPi\/Source\/Videocoreiv-qpu\/",
     "DC68E02BF158588759BD0B643A3FD70C0B65AC18" : "PopPi\/Source\/HackDriver\/"
   },
   "DVTSourceControlWorkspaceBlueprintNameKey" : "PopPi",
   "DVTSourceControlWorkspaceBlueprintVersion" : 204,
   "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "PopPi.xcodeproj",
   "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/jetpacapp\/qpu-asm.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "1DAA7F96BA3F4D9BA3429FA3345F547E0B82738A"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/NewChromantics\/videocoreiv-qpu.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "AEC780B3BA0C34CA27C5751DB1075858FD60F54C"
+    },
     {
       "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/NewChromantics\/PopPi.git",
       "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
