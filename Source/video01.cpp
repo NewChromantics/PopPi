@@ -435,6 +435,33 @@ uint8_t gProgram1[0x1000]  __attribute__ ((aligned(4)));
 
 extern void SetTick(uint32_t Tick);
 
+
+#include "duktape-2.3.0/src/duktape.h"
+
+namespace Js
+{
+	class TContext;
+}
+
+
+class Js::TContext
+{
+	public:
+	TContext();
+	~TContext();
+	
+	void		Execute(const char* Script);
+	
+	void		BindPrint();
+	
+	public:
+	static std::function<void(int,int,const char*)>*	mPrint;
+	duk_context*	mContext;
+};
+
+std::function<void(int,int,const char*)>* Js::TContext::mPrint = nullptr;
+
+
 CAPI int notmain ( void )
 {
 	TKernel Kernel;
@@ -606,7 +633,18 @@ CAPI int notmain ( void )
 	auto* Program1End = Display.SetupRenderControl( Program1Mem, TileBinMem );
 
 	
-	
+	std::function<void(int,int,const char*)> Print = [&](int x,int y,const char* String)
+	{
+		Display.DrawString( x, Display.mHeight-y, String );
+	};
+	Js::TContext::mPrint = &Print;
+
+	(*Js::TContext::mPrint)(0,0,"One");
+
+	Js::TContext Context;
+
+	(*Js::TContext::mPrint)(0,0,"Two");
+
 	uint32_t Tick = 0;
 	while ( true )
 	{
@@ -617,8 +655,9 @@ CAPI int notmain ( void )
 		{
 			if ( Tick % DrawTickFrequency == 0  )
 			{
-				Display.DrawString( Display.GetConsoleX(), Display.mHeight-9, "Tick ");
-				Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
+				//Display.DrawString( Display.GetConsoleX(), Display.mHeight-9, "beep! tick x ");
+				//Display.DrawNumber( Display.GetConsoleX(false), Display.GetConsoleY(), Tick );
+				Context.Execute("print(\"hello!\");");
 			}
 		}
 		
@@ -660,6 +699,38 @@ CAPI int notmain ( void )
 
 
     return(0);
+}
+
+
+
+
+Js::TContext::TContext() :
+	mContext	( nullptr )
+{
+	mContext = duk_create_heap_default();
+
+	/*
+	auto Print = [](duk_context* Context) ->duk_ret_t
+	{
+		auto& PrintFunc = *Js::TContext::mPrint;
+		PrintFunc( 0,0,"I am Print()!");
+		return 0;
+	};
+	
+	duk_push_c_function( mContext, Print, 3);
+	duk_put_global_string( mContext, "print");
+	*/
+}
+
+Js::TContext::~TContext()
+{
+	duk_destroy_heap( mContext );
+}
+
+void Js::TContext::Execute(const char* Script)
+{
+	duk_eval_string( mContext, Script );
+	duk_pop( mContext );	//	pop eval result
 }
 
 

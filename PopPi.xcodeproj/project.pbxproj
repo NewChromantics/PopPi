@@ -42,12 +42,18 @@
 		BF71CDF21FCE26800084D367 /* Frag_UvTick.qpuasm */ = {isa = PBXFileReference; lastKnownFileType = text; name = Frag_UvTick.qpuasm; path = Source/Frag_UvTick.qpuasm; sourceTree = "<group>"; };
 		BF71CDF31FCE26D20084D367 /* Frag_UvTick.qpuasm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Frag_UvTick.qpuasm.h; path = Source/Frag_UvTick.qpuasm.h; sourceTree = "<group>"; };
 		BF71CDF41FCE26DE0084D367 /* Frag_Rgb.qpuasm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Frag_Rgb.qpuasm.h; path = Source/Frag_Rgb.qpuasm.h; sourceTree = "<group>"; };
+		BFEA8EE02158EE2200FA99CF /* duktape-2.3.0 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "duktape-2.3.0"; path = "Source/duktape-2.3.0"; sourceTree = SOURCE_ROOT; };
+		BFEA8EE22158EE6000FA99CF /* duk_config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = duk_config.h; path = "Source/duktape-2.3.0/src/duk_config.h"; sourceTree = "<group>"; };
+		BFEA8EE32158EE6000FA99CF /* duktape.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = duktape.c; path = "Source/duktape-2.3.0/src/duktape.c"; sourceTree = "<group>"; };
+		BFEA8EE42158EE6000FA99CF /* duktape.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = duktape.h; path = "Source/duktape-2.3.0/src/duktape.h"; sourceTree = "<group>"; };
+		BFEA8EE72158F6F900FA99CF /* Types.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Types.cpp; path = Source/Types.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		BF7026D81FBDE7E000354F35 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				BFEA8EE12158EE4C00FA99CF /* Duktape */,
 				BF7026DC1FBDEC0C00354F35 /* loader */,
 				BF7026D41FBDE7D600354F35 /* periph.c */,
 				BF7026D51FBDE7D600354F35 /* vectors.s */,
@@ -59,6 +65,7 @@
 				BF030B6F1FC35E43001BBB03 /* Sprites.cpp */,
 				BF5EC01B1FC7012B002ABF16 /* Blitter.cpp */,
 				BF5EC01C1FC70137002ABF16 /* Blitter.h */,
+				BFEA8EE72158F6F900FA99CF /* Types.cpp */,
 				BF5EC01D1FC705DA002ABF16 /* Types.h */,
 				BF5EC01E1FC70CD1002ABF16 /* Display.cpp */,
 				BF5EC01F1FC70CD1002ABF16 /* Display.h */,
@@ -90,6 +97,7 @@
 		BFD306331FBDE78700F650B6 = {
 			isa = PBXGroup;
 			children = (
+				BFEA8EE02158EE2200FA99CF /* duktape-2.3.0 */,
 				BF71CDED1FCDF7D20084D367 /* QpuAssembler */,
 				BF7026DD1FC1016400354F35 /* kernel.asm */,
 				BF7026DE1FC101E900354F35 /* CONTROL_LIST.INC */,
@@ -100,6 +108,16 @@
 				BF7026DB1FBDEAC600354F35 /* HackDriver */,
 				BF7026D81FBDE7E000354F35 /* Source */,
 			);
+			sourceTree = "<group>";
+		};
+		BFEA8EE12158EE4C00FA99CF /* Duktape */ = {
+			isa = PBXGroup;
+			children = (
+				BFEA8EE22158EE6000FA99CF /* duk_config.h */,
+				BFEA8EE32158EE6000FA99CF /* duktape.c */,
+				BFEA8EE42158EE6000FA99CF /* duktape.h */,
+			);
+			name = Duktape;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

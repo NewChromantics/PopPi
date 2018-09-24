@@ -1,23 +1,33 @@
-# gr: brew build doesn't boot :/
-#ARMPATH ?= /usr/local/Cellar/gcc-arm-none-eabi/20160928
-#ARMLIBPATH ?= $(ARMPATH)/lib/gcc/arm-none-eabi/5.4.1/armv7-m
-ARMPATH ?= /Users/graham/devkitPro/devkitARM
-ARMLIBPATH ?= $(ARMPATH)/lib/gcc/arm-none-eabi/7.1.0
+# armv6 DOES work on pi zero though, as it's not armv7!
+# gr: we need libgcc for aeabi float/math functions
+# 	so we have generic(?) arm gcc stuff in the /lib folder, and hardware specific libc stuff in armXX/lib/platformXX/ folders!
+# this means we can now compile with homebrew stuff!
+ARMPATH ?= /usr/local/Cellar/gcc-arm-none-eabi/20160928
+#ARMLIBPATH ?= $(ARMPATH)/lib/gcc/arm-none-eabi/5.4.1/armv6-m
+#LINKOPS = -L$(ARMLIBPATH) -lgcc -lc
+ARMLIBPATH ?= $(ARMPATH)/arm-none-eabi/lib/armv6-m
+LINKOPS = -L$(ARMLIBPATH) -lc -lm -lg -L$(ARMPATH)/lib/gcc/arm-none-eabi/5.4.1/armv6-m -lgcc
+
+
+
+#ARMLIBPATH ?= $(ARMPATH)/arm-none-eabi/lib/
+#LINKOPS = -L$(ARMLIBPATH) -lc -lstdc++
 
 ARMGNU ?= $(ARMPATH)/bin/arm-none-eabi-
 
 TARGET = kernel.img
 PROJECTNAME = PopPi
 
-COPS = -Wall -O2 -nostdlib -nostartfiles -ffreestanding 
-CPPOPS = -Wall -O2 -std=c++11 -nostdlib -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions -fno-rtti
+COPS = -Wall -O2 -nostartfiles -ffreestanding
+CPPOPS = -Wall -O2 -std=c++11 -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions -fno-rtti
 QPUASMOPS = --exportentry=false
 
-LINKOPS = -L$(ARMLIBPATH) -lgcc 
+
 #-lfplib
 #-lgcc
 
 COBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
+COBJECTS += duktape-2.3.0/src/duktape.o
 CPPOBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 SOBJECTS = $(patsubst %.s, %.o, $(wildcard *.s))
 QPUOBJECTS = $(patsubst %.qpuasm, %.qpuasm.h, $(wildcard *.qpuasm))
