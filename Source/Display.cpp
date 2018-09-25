@@ -144,12 +144,12 @@ TDisplayInfo DisplayInfo;
 
 
 
-TDisplay::TDisplay(int Width,int Height) :
+TDisplay::TDisplay(int Width,int Height,bool Mirror) :
 	mScreenBuffer	( nullptr ),
 	mWidth			( Width ),
 	mHeight			( Height ),
 	mClearColour	( RGBA( 255,0,255,255 ) ),
-	TBlitter		( [this]{	return this->LockCanvas();	} )
+	TBlitter		( [this]{	return this->LockCanvas();	}, Mirror )
 {
 	
 	auto ScrollX = 0;

@@ -26,7 +26,7 @@ enum class TGpuThread : uint32_t
 class TDisplay : public TBlitter
 {
 public:
-	TDisplay(int Width,int Height);
+	TDisplay(int Width,int Height,bool Mirror);
 	
 	void		SetResolution(uint32_t Width,uint32_t Height);
 

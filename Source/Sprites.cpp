@@ -1,7 +1,7 @@
 #include "Sprites.h"
 
 
-constexpr TColour32 TColour32::Transparent	( 0, 255, 0, 0 );
+constexpr TColour32 TColour32::Transparent	( 0, 0, 255, 255 );
 constexpr TColour32 TColour32::White		( 255, 255, 255, 255 );
 constexpr TColour32 TColour32::Black		( 0, 0, 0, 255 );
 

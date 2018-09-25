@@ -8,8 +8,9 @@
 #define TEST_PAD	100
 
 
-TBlitter::TBlitter(std::function<TCanvas<TPixel>()> LockCanvas) :
-	mLockCanvas	( LockCanvas )
+TBlitter::TBlitter(std::function<TCanvas<TPixel>()> LockCanvas,bool MirrorCanvas) :
+	mLockCanvas	( LockCanvas ),
+	mMirror		( MirrorCanvas )
 {
 	
 }
@@ -23,6 +24,12 @@ void TBlitter::SetPixel(int Index,uint32_t Colour)
 {
 	auto Canvas = GetCanvas();
 
+	if ( mMirror )
+	{
+		auto x = Index % Canvas.mWidth;
+		Index -= x;
+		Index += Canvas.mWidth-1-x;
+	}
 	Canvas.mPixels[Index] = Colour;
 }
 
@@ -32,6 +39,14 @@ void TBlitter::SetPixel(int x,int y,uint32_t Colour)
 	auto Canvas = GetCanvas();
 	
 	auto Index = Canvas.GetIndex(x,y);
+	
+	if ( mMirror )
+	{
+		auto x = Index % Canvas.mWidth;
+		Index -= x;
+		Index += Canvas.mWidth-1-x;
+	}
+	
 	Canvas.mPixels[Index] = Colour;
 }
 
@@ -68,8 +83,17 @@ void TBlitter::DrawChar(int x,int y,int Char,int& Width)
 		x %= Canvas.mWidth;
 		y += Height + GetLineSpacing();
 	}
+	
 	y %= Canvas.mHeight;
-		
+	static bool ClearOnPage = true;
+	if ( ClearOnPage )
+	{
+		if ( y == 0 )
+		{
+			this->FillPixels( RGBA( 0, 0, 255, 255 ) );
+		}
+	}
+
 
 	for ( int row=0;	row<Height;	row++ )
 	{
@@ -153,6 +177,7 @@ void TBlitter::DrawString(int x,int y,const char* String)
 		DrawChar( x, y, Char, Width );
 		x += Width;
 	}
+
 }
 
 void TBlitter::FillPixels(uint32_t Colour)

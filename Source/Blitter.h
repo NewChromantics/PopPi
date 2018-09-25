@@ -175,7 +175,7 @@ class TBlitter
 {
 	typedef uint32_t	TPixel;
 public:
-	TBlitter(std::function<TCanvas<TPixel>()> LockCanvas);
+	TBlitter(std::function<TCanvas<TPixel>()> LockCanvas,bool MirrorCanvas);
 	
 	void		SetPixel(int x,int y,TPixel Colour);
 	void		SetPixel(int Index,TPixel Colour);
@@ -199,5 +199,6 @@ private:
 public:
 	std::function<TCanvas<TPixel>()>	mLockCanvas;
 
+	bool		mMirror;
 	uint32_2	mConsolePos;
 };

@@ -238,7 +238,7 @@ CAPI int notmain()
 	TKernel Kernel;
 	//TDisplay Display( 1280, 720 );
 	//TDisplay Display( 1920, 1080 );
-	TDisplay Display( 320, 240 );
+	TDisplay Display( 320, 240, true );
 	
 	Display.FillPixelsCheckerBoard(CHECKERBOARD_SIZE,CHECKERBOARD_COLOURA,CHECKERBOARD_COLOURB);
 	
