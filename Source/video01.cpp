@@ -265,7 +265,7 @@ CAPI int notmain()
 	};
 	Js::TContext::mPrint = &Print;
 
-	
+	(*Js::TContext::mPrint)("pad");
 	
 	(*Js::TContext::mPrint)("One");
 	Js::TContext Context( Kernel.mHeap, Print );

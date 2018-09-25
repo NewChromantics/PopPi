@@ -1,7 +1,11 @@
-
+/*
+	this explains how all this works
+https://github.com/dwelch67/raspberrypi/tree/master/bssdata
+*/
 MEMORY
 {
-    ram : ORIGIN = 0x8000, LENGTH = 0x8000000
+/*    ram : ORIGIN = 0x8000, LENGTH = 0x8000000*/
+    ram : ORIGIN = 0x8000, LENGTH = 0x3000000
 }
 
 SECTIONS

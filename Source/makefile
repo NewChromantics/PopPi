@@ -18,8 +18,12 @@ ARMGNU ?= $(ARMPATH)/bin/arm-none-eabi-
 TARGET = kernel.img
 PROJECTNAME = PopPi
 
-COPS = -Wall -O2 -nostartfiles -ffreestanding
-CPPOPS = -Wall -O2 -std=c++11 -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions -fno-rtti
+FLOAT_ABI ?= hard
+#ALLOPS = -march=armv6k -mtune=arm1176jzf-s -marm -mfpu=vfp -mfloat-abi=$(FLOAT_ABI) -DRASPPI=1
+ALLOPS =
+SOPS = $(ALLOPS)
+COPS = $(ALLOPS) -Wall -O2 -nostartfiles -ffreestanding
+CPPOPS = $(ALLOPS) -Wall -O2 -std=c++11 -nostartfiles -ffreestanding -DTARGET_CPP -fno-exceptions -fno-rtti -I./
 QPUASMOPS = --exportentry=false
 
 
@@ -60,7 +64,7 @@ clean :
 
 %.o : %.s
 	@echo compiling as $<
-	$(ARMGNU)as $< -o $@
+	$(ARMGNU)as $(SOPS) $< -o $@
 
 %.o : %.c
 	@echo compiling gcc $<

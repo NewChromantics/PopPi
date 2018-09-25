@@ -60,7 +60,15 @@ void TBlitter::FillRow(int y,uint32_t Colour)
 	
 	for ( ;	Start<End;	Start++ )
 	{
-		Canvas.mPixels[Start] = Colour;
+		auto Index = Start;
+		if ( mMirror )
+		{
+			auto x = Index % Canvas.mWidth;
+			Index -= x;
+			Index += Canvas.mWidth-1-x;
+		}
+		
+		Canvas.mPixels[Index] = Colour;
 	}
 }
 
@@ -85,7 +93,7 @@ void TBlitter::DrawChar(int x,int y,int Char,int& Width)
 	}
 	
 	y %= Canvas.mHeight;
-	static bool ClearOnPage = true;
+	static bool ClearOnPage = false;
 	if ( ClearOnPage )
 	{
 		if ( y == 0 )
@@ -185,11 +193,19 @@ void TBlitter::FillPixels(uint32_t Colour)
 	auto Canvas = GetCanvas();
 	
 	auto Start = Canvas.GetIndex( 0, 0 );
-	auto End = Canvas.GetIndex( Canvas.mWidth, Canvas.mHeight );
+	auto End = Canvas.GetIndex( Canvas.mWidth, Canvas.mHeight-1 );
 	
 	for ( ;	Start<End;	Start++ )
 	{
-		Canvas.mPixels[Start] = Colour;
+		auto Index = Start;
+		if ( mMirror )
+		{
+			auto x = Index % Canvas.mWidth;
+			Index -= x;
+			Index += Canvas.mWidth-1-x;
+		}
+		
+		Canvas.mPixels[Index] = Colour;
 	}
 }
 

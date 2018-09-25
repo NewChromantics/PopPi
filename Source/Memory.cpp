@@ -6,6 +6,8 @@
 #define ALLOC_ALIGNMENT				0x1000
 
 
+
+
 uint8_t* TGpuMemory::GetCpuAddress() const	{	return TKernel::GetCpuAddress(mLockedAddress);	}
 uint8_t* TGpuMemory::GetGpuAddress() const	{	return TKernel::GetGpuAddress(mLockedAddress);	}
 uint8_t* TGpuMemory::GetBusAddress() const	{	return TKernel::GetBusAddress(mLockedAddress);	}

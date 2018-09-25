@@ -39,12 +39,12 @@ void TKernel::Sleep(uint32_t Ms)
 }
 
 
-TDisplay::TDisplay(int Width,int Height) :
+TDisplay::TDisplay(int Width,int Height,bool Mirror) :
 	mScreenBuffer	( nullptr ),
 	mWidth			( Width ),
 	mHeight			( Height ),
 	mClearColour	( RGBA( 255,0,255,255 ) ),
-	TBlitter		( [this]{	return this->LockCanvas();	} )
+	TBlitter		( [this]{	return this->LockCanvas();	}, Mirror )
 {
 	mScreenBuffer = new uint32_t[ mWidth * mHeight ];
 }
