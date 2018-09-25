@@ -24,13 +24,20 @@ constexpr TColour32 Palette[3] =
 #define SPRITE_ATLAS_BLOCK_PREFIX_SIZE	(1+SPRITE_ATLAS_LFSIZE)	//	ident+lf
 #define SPRITE_ATLAS_BLOCK_SIZE	(SPRITE_ATLAS_BLOCK_PREFIX_SIZE+(SPRITE_WIDTH*SPRITE_HEIGHT)+(SPRITE_ATLAS_LFSIZE*SPRITE_HEIGHT))
 
-constexpr const char RawSpriteAtlas[] =
+//	osx gives us access errors if we modify const memory
+//#define ENABLE_CONST_ATLAS
+
+#if defined(ENABLE_CONST_ATLAS)
+constexpr const
+#endif
+char RawSpriteAtlas[] =
 #include "SpriteCharAtlas.inc"
 ;
+#if defined(ENABLE_CONST_ATLAS)
 static_assert( RawSpriteAtlas[0]=='\n', "0" );
 static_assert( RawSpriteAtlas[SPRITE_ATLAS_PREFIX_SIZE]=='#', "first tab" );
 static_assert( RawSpriteAtlas[SPRITE_ATLAS_PREFIX_SIZE+SPRITE_ATLAS_BLOCK_PREFIX_SIZE]=='X', "X");
-
+#endif
 
 template<size_t N>
 constexpr size_t length(char const (&)[N])

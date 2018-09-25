@@ -6,6 +6,31 @@
 	objectVersion = 46;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BFEA8F06215A635B00FA99CF /* KernelOsx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BFEA8F05215A635B00FA99CF /* KernelOsx.cpp */; };
+		BFEA8F09215A643400FA99CF /* video01.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BF7026D61FBDE7D600354F35 /* video01.cpp */; };
+		BFEA8F0B215A644600FA99CF /* Debug.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BFEA8EF721596B1E00FA99CF /* Debug.cpp */; };
+		BFEA8F0C215A644600FA99CF /* Sprites.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BF030B6F1FC35E43001BBB03 /* Sprites.cpp */; };
+		BFEA8F0D215A644600FA99CF /* Blitter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BF5EC01B1FC7012B002ABF16 /* Blitter.cpp */; };
+		BFEA8F0E215A644600FA99CF /* Types.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BFEA8EE72158F6F900FA99CF /* Types.cpp */; };
+		BFEA8F10215A644600FA99CF /* Heap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BFEA8EF5215968B400FA99CF /* Heap.cpp */; };
+		BFEA8F12215A644600FA99CF /* Js_Duktape.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BFEA8EED215928E000FA99CF /* Js_Duktape.cpp */; };
+		BFEA8F14215A647B00FA99CF /* Kernel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BFEA8F13215A647B00FA99CF /* Kernel.cpp */; };
+		BFEA8F15215A65B000FA99CF /* duktape.c in Sources */ = {isa = PBXBuildFile; fileRef = BFEA8EE32158EE6000FA99CF /* duktape.c */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BFEA8EFB215A631E00FA99CF /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		BF030B6F1FC35E43001BBB03 /* Sprites.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Sprites.cpp; path = Source/Sprites.cpp; sourceTree = "<group>"; };
 		BF030B701FC35E6E001BBB03 /* Sprites.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Sprites.h; path = Source/Sprites.h; sourceTree = "<group>"; };
@@ -55,51 +80,68 @@
 		BFEA8EF5215968B400FA99CF /* Heap.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Heap.cpp; path = Source/Heap.cpp; sourceTree = "<group>"; };
 		BFEA8EF621596AD900FA99CF /* Debug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Debug.h; path = Source/Debug.h; sourceTree = "<group>"; };
 		BFEA8EF721596B1E00FA99CF /* Debug.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Debug.cpp; path = Source/Debug.cpp; sourceTree = "<group>"; };
-		BFEA8EF8215970AC00FA99CF /* Kernel.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Kernel.cpp; path = Source/Kernel.cpp; sourceTree = "<group>"; };
+		BFEA8EF8215970AC00FA99CF /* KernelPi.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = KernelPi.cpp; path = Source/KernelPi.cpp; sourceTree = "<group>"; };
+		BFEA8EFD215A631E00FA99CF /* KernelOsx */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = KernelOsx; sourceTree = BUILT_PRODUCTS_DIR; };
+		BFEA8F05215A635B00FA99CF /* KernelOsx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = KernelOsx.cpp; path = Source/KernelOsx.cpp; sourceTree = "<group>"; };
+		BFEA8F08215A641100FA99CF /* KernelOsx.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = KernelOsx.xcconfig; path = ../PopEngine/src/KernelOsx.xcconfig; sourceTree = "<group>"; };
+		BFEA8F13215A647B00FA99CF /* Kernel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Kernel.cpp; path = Source/Kernel.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BFEA8EFA215A631E00FA99CF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		BF7026D81FBDE7E000354F35 /* Source */ = {
 			isa = PBXGroup;
 			children = (
-				BFEA8EE12158EE4C00FA99CF /* Duktape */,
-				BF7026DC1FBDEC0C00354F35 /* loader */,
-				BF7026D41FBDE7D600354F35 /* periph.c */,
-				BF7026D51FBDE7D600354F35 /* vectors.s */,
-				BFEA8EF32159604F00FA99CF /* PiGpu.cpp */,
-				BFEA8EF22159604F00FA99CF /* PiGpu.h */,
-				BF7026D61FBDE7D600354F35 /* video01.cpp */,
-				BF7026D71FBDE7DE00354F35 /* makefile */,
-				BF030B701FC35E6E001BBB03 /* Sprites.h */,
-				BF030B721FC36DA5001BBB03 /* SpriteCharAtlas.inc */,
-				BF030B711FC35EAB001BBB03 /* Kernel.h */,
-				BFEA8EF8215970AC00FA99CF /* Kernel.cpp */,
-				BFEA8EF621596AD900FA99CF /* Debug.h */,
-				BFEA8EF721596B1E00FA99CF /* Debug.cpp */,
-				BF030B6F1FC35E43001BBB03 /* Sprites.cpp */,
 				BF5EC01B1FC7012B002ABF16 /* Blitter.cpp */,
 				BF5EC01C1FC70137002ABF16 /* Blitter.h */,
-				BFEA8EE72158F6F900FA99CF /* Types.cpp */,
-				BF5EC01D1FC705DA002ABF16 /* Types.h */,
+				BFEA8EF721596B1E00FA99CF /* Debug.cpp */,
+				BFEA8EF621596AD900FA99CF /* Debug.h */,
 				BF5EC01E1FC70CD1002ABF16 /* Display.cpp */,
 				BF5EC01F1FC70CD1002ABF16 /* Display.h */,
-				BF5EC0201FC70EE8002ABF16 /* Mailbox.cpp */,
-				BF5EC0211FC70EF3002ABF16 /* Mailbox.h */,
-				BFEA8EF5215968B400FA99CF /* Heap.cpp */,
-				BFEA8EF4215968B400FA99CF /* Heap.h */,
-				BF5EC0231FC85750002ABF16 /* Memory.cpp */,
-				BF5EC0241FC85750002ABF16 /* Memory.h */,
-				BF5EC0251FC9F463002ABF16 /* Red.frag */,
+				BFEA8EE12158EE4C00FA99CF /* Duktape */,
 				BF71CDEB1FCDEBCA0084D367 /* Frag_Colours.qpuasm */,
 				BF71CDEC1FCDEC3B0084D367 /* Frag_Colours.qpuasm.h */,
-				BF71CDEF1FCDFE9B0084D367 /* Frag_Uv.qpuasm */,
-				BF71CDF01FCDFED40084D367 /* Frag_Uv.qpuasm.h */,
 				BF71CDF11FCE23F00084D367 /* Frag_Rgb.qpuasm */,
 				BF71CDF41FCE26DE0084D367 /* Frag_Rgb.qpuasm.h */,
+				BF71CDEF1FCDFE9B0084D367 /* Frag_Uv.qpuasm */,
+				BF71CDF01FCDFED40084D367 /* Frag_Uv.qpuasm.h */,
 				BF71CDF21FCE26800084D367 /* Frag_UvTick.qpuasm */,
 				BF71CDF31FCE26D20084D367 /* Frag_UvTick.qpuasm.h */,
+				BFEA8EF5215968B400FA99CF /* Heap.cpp */,
+				BFEA8EF4215968B400FA99CF /* Heap.h */,
 				BFEA8EED215928E000FA99CF /* Js_Duktape.cpp */,
 				BFEA8EEE215928E000FA99CF /* Js_Duktape.h */,
+				BF030B711FC35EAB001BBB03 /* Kernel.h */,
+				BFEA8F05215A635B00FA99CF /* KernelOsx.cpp */,
+				BFEA8F08215A641100FA99CF /* KernelOsx.xcconfig */,
+				BFEA8F13215A647B00FA99CF /* Kernel.cpp */,
+				BFEA8EF8215970AC00FA99CF /* KernelPi.cpp */,
+				BF7026DC1FBDEC0C00354F35 /* loader */,
+				BF5EC0201FC70EE8002ABF16 /* Mailbox.cpp */,
+				BF5EC0211FC70EF3002ABF16 /* Mailbox.h */,
+				BF7026D71FBDE7DE00354F35 /* makefile */,
+				BF5EC0231FC85750002ABF16 /* Memory.cpp */,
+				BF5EC0241FC85750002ABF16 /* Memory.h */,
+				BF7026D41FBDE7D600354F35 /* periph.c */,
+				BFEA8EF32159604F00FA99CF /* PiGpu.cpp */,
+				BFEA8EF22159604F00FA99CF /* PiGpu.h */,
+				BF5EC0251FC9F463002ABF16 /* Red.frag */,
+				BF030B721FC36DA5001BBB03 /* SpriteCharAtlas.inc */,
+				BF030B6F1FC35E43001BBB03 /* Sprites.cpp */,
+				BF030B701FC35E6E001BBB03 /* Sprites.h */,
+				BFEA8EE72158F6F900FA99CF /* Types.cpp */,
+				BF5EC01D1FC705DA002ABF16 /* Types.h */,
+				BF7026D51FBDE7D600354F35 /* vectors.s */,
+				BF7026D61FBDE7D600354F35 /* video01.cpp */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -125,6 +167,7 @@
 				BF7026E21FC101E900354F35 /* V3D.INC */,
 				BF7026DB1FBDEAC600354F35 /* HackDriver */,
 				BF7026D81FBDE7E000354F35 /* Source */,
+				BFEA8EFE215A631E00FA99CF /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -136,6 +179,14 @@
 				BFEA8EE42158EE6000FA99CF /* duktape.h */,
 			);
 			name = Duktape;
+			sourceTree = "<group>";
+		};
+		BFEA8EFE215A631E00FA99CF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BFEA8EFD215A631E00FA99CF /* KernelOsx */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,6 +208,26 @@
 		};
 /* End PBXLegacyTarget section */
 
+/* Begin PBXNativeTarget section */
+		BFEA8EFC215A631E00FA99CF /* KernelOsx */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BFEA8F02215A631E00FA99CF /* Build configuration list for PBXNativeTarget "KernelOsx" */;
+			buildPhases = (
+				BFEA8EF9215A631E00FA99CF /* Sources */,
+				BFEA8EFA215A631E00FA99CF /* Frameworks */,
+				BFEA8EFB215A631E00FA99CF /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KernelOsx;
+			productName = KernelOsx;
+			productReference = BFEA8EFD215A631E00FA99CF /* KernelOsx */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
 /* Begin PBXProject section */
 		BFD306341FBDE78700F650B6 /* Project object */ = {
 			isa = PBXProject;
@@ -166,6 +237,10 @@
 				TargetAttributes = {
 					BFD306381FBDE78700F650B6 = {
 						CreatedOnToolsVersion = 8.3.3;
+						ProvisioningStyle = Automatic;
+					};
+					BFEA8EFC215A631E00FA99CF = {
+						CreatedOnToolsVersion = 9.3;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -178,13 +253,35 @@
 				en,
 			);
 			mainGroup = BFD306331FBDE78700F650B6;
+			productRefGroup = BFEA8EFE215A631E00FA99CF /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				BFD306381FBDE78700F650B6 /* PopPi */,
+				BFEA8EFC215A631E00FA99CF /* KernelOsx */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BFEA8EF9215A631E00FA99CF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BFEA8F10215A644600FA99CF /* Heap.cpp in Sources */,
+				BFEA8F0C215A644600FA99CF /* Sprites.cpp in Sources */,
+				BFEA8F09215A643400FA99CF /* video01.cpp in Sources */,
+				BFEA8F12215A644600FA99CF /* Js_Duktape.cpp in Sources */,
+				BFEA8F14215A647B00FA99CF /* Kernel.cpp in Sources */,
+				BFEA8F15215A65B000FA99CF /* duktape.c in Sources */,
+				BFEA8F0D215A644600FA99CF /* Blitter.cpp in Sources */,
+				BFEA8F0B215A644600FA99CF /* Debug.cpp in Sources */,
+				BFEA8F0E215A644600FA99CF /* Types.cpp in Sources */,
+				BFEA8F06215A635B00FA99CF /* KernelOsx.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		BFD306391FBDE78700F650B6 /* Debug */ = {
@@ -293,6 +390,54 @@
 			};
 			name = Release;
 		};
+		BFEA8F03215A631E00FA99CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BFEA8F08215A641100FA99CF /* KernelOsx.xcconfig */;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		BFEA8F04215A631E00FA99CF /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BFEA8F08215A641100FA99CF /* KernelOsx.xcconfig */;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -310,6 +455,15 @@
 			buildConfigurations = (
 				BFD3063C1FBDE78700F650B6 /* Debug */,
 				BFD3063D1FBDE78700F650B6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BFEA8F02215A631E00FA99CF /* Build configuration list for PBXNativeTarget "KernelOsx" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BFEA8F03215A631E00FA99CF /* Debug */,
+				BFEA8F04215A631E00FA99CF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

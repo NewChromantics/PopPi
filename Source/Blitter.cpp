@@ -1,6 +1,10 @@
 #include "Blitter.h"
 #include "Sprites.h"
 
+#if defined(TARGET_OSX)
+#include <iostream>
+#endif
+
 #define TEST_PAD	100
 
 
@@ -50,6 +54,9 @@ void TBlitter::FillRow(int y,uint32_t Colour)
 
 void TBlitter::DrawChar(int x,int y,int Char,int& Width)
 {
+#if defined(TARGET_OSX)
+	std::cout << (char)Char;
+#endif
 	auto Canvas = GetCanvas();
 
 	int Height;
@@ -141,7 +148,7 @@ void TBlitter::DrawString(int x,int y,const char* String)
 		auto Char = String[0];
 		String++;
 		if ( Char == '\0' )
-		break;
+			break;
 		int Width = 1;
 		DrawChar( x, y, Char, Width );
 		x += Width;

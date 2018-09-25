@@ -2,25 +2,8 @@
 #include "Sprites.h"
 #include "Blitter.h"
 #include "Display.h"
-#include "Mailbox.h"
 #include "Memory.h"
 #include "Js_Duktape.h"
-
-uint32_t TKernel::mCpuMemoryBase = 0xbad0bad1;
-uint32_t TKernel::mCpuMemorySize = 0xbad2bad3;
-uint32_t TKernel::mGpuMemoryBase = 0xbad4bad5;
-uint32_t TKernel::mGpuMemorySize = 0xbad6bad7;
-
-void TKernel::Sleep(uint32_t Ms)
-{
-	//	random number, tis loop is basicaly "sleep for x ticks" so 250/1000mhz of nops is what we need?
-	Ms *= 1 * 250 * 100;
-	while ( Ms > 0 )
-	{
-		Ms--;
-		asm ("nop");
-	}
-}
 
 
 
@@ -261,14 +244,15 @@ CAPI int notmain()
 	
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Hello world!");
 
+#if !defined(TARGET_OSX)
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Cpu base address: ");
 	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), TKernel::mCpuMemoryBase );
 	Display.DrawString( Display.GetConsoleX(false), Display.GetConsoleY(), " size: ");
 	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), TKernel::mCpuMemorySize );
-	
+#endif
+
 	Display.DrawString( Display.GetConsoleX(), Display.GetConsoleY(), "Screen Buffer address = ");
-	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), (uint32_t)Display.mScreenBuffer );
-	
+	Display.DrawHex( Display.GetConsoleX(false), Display.GetConsoleY(), (uint32_t)(intptr_t)Display.mScreenBuffer );
 
 	
 	std::function<void(const char*)> Print = [&](const char* String)
