@@ -16072,7 +16072,11 @@ DUK_EXTERNAL duk_hthread *duk_create_heap(duk_alloc_function alloc_func,
                                           void *heap_udata,
                                           duk_fatal_function fatal_handler) {
 	duk_heap *heap = NULL;
-	duk_hthread *thr;
+	duk_hthread *thr = NULL;
+
+	//	test funcs first
+	fatal_handler( heap_udata, "fatal_handler test ");
+	alloc_func( heap_udata, 100);
 
 	/* Assume that either all memory funcs are NULL or non-NULL, mixed
 	 * cases will now be unsafe.
@@ -16109,11 +16113,16 @@ DUK_EXTERNAL duk_hthread *duk_create_heap(duk_alloc_function alloc_func,
 
 	heap = duk_heap_alloc(alloc_func, realloc_func, free_func, heap_udata, fatal_handler);
 	if (!heap) {
+		fatal_handler( heap_udata, "duk_heap_alloc failed to alloc");
 		return NULL;
 	}
+	
+	fatal_handler( heap_udata, "thr = heap->heap_thread;");
 	thr = heap->heap_thread;
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(thr->heap != NULL);
+	fatal_handler( heap_udata, "return thr;");
+	
 	return thr;
 }
 
@@ -47790,11 +47799,12 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	duk_heap *res = NULL;
 	duk_uint32_t st_initsize;
 
+	fatal_func(heap_udata, "pre allocate heap message");
 	DUK_D(DUK_DPRINT("allocate heap"));
+	fatal_func(heap_udata, "post allocate heap message");
 
-	/*
-	 *  Random config sanity asserts
-	 */
+	//  Random config sanity asserts
+	
 
 	DUK_ASSERT(DUK_USE_STRTAB_MINSIZE >= 64);
 
@@ -47802,21 +47812,22 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	DUK_ASSERT((DUK_HTYPE_BUFFER & 0x01U) == 0);
 	DUK_ASSERT((DUK_HTYPE_OBJECT & 0x01U) == 1);  /* DUK_HEAPHDR_IS_OBJECT() relies ont his. */
 
-	/*
-	 *  Debug dump type sizes
-	 */
+	//  Debug dump type sizes
+
 
 #if defined(DUK_USE_DEBUG)
+	fatal_func(heap_udata, "duk__dump_misc_options");
 	duk__dump_misc_options();
 	duk__dump_type_sizes();
 	duk__dump_type_limits();
 #endif
 
-	/*
-	 *  If selftests enabled, run them as early as possible.
-	 */
+ 
+	//  If selftests enabled, run them as early as possible.
+ 
 
 #if defined(DUK_USE_SELF_TESTS)
+	fatal_func(heap_udata, "run self tests");
 	DUK_D(DUK_DPRINT("run self tests"));
 	if (duk_selftest_run_tests(alloc_func, realloc_func, free_func, heap_udata) > 0) {
 		fatal_func(heap_udata, "self test(s) failed");
@@ -47824,16 +47835,16 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	DUK_D(DUK_DPRINT("self tests passed"));
 #endif
 
-	/*
-	 *  Important assert-like checks that should be enabled even
-	 *  when assertions are otherwise not enabled.
-	 */
+ 
+	 //  Important assert-like checks that should be enabled even
+	 //  when assertions are otherwise not enabled.
+
 
 #if defined(DUK_USE_EXEC_REGCONST_OPTIMIZE)
-	/* Can't check sizeof() using preprocessor so explicit check.
-	 * This will be optimized away in practice; unfortunately a
-	 * warning is generated on some compilers as a result.
-	 */
+	// Can't check sizeof() using preprocessor so explicit check.
+	// This will be optimized away in practice; unfortunately a
+	// warning is generated on some compilers as a result.
+	
 #if defined(DUK_USE_PACKED_TVAL)
 	if (sizeof(duk_tval) != 8) {
 #else
@@ -47841,22 +47852,21 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 #endif
 		fatal_func(heap_udata, "sizeof(duk_tval) not 8 or 16, cannot use DUK_USE_EXEC_REGCONST_OPTIMIZE option");
 	}
-#endif  /* DUK_USE_EXEC_REGCONST_OPTIMIZE */
+#endif  // DUK_USE_EXEC_REGCONST_OPTIMIZE
 
-	/*
-	 *  Computed values (e.g. INFINITY)
-	 */
+	//  Computed values (e.g. INFINITY)
+	
 
 #if defined(DUK_USE_COMPUTED_NAN)
 	do {
-		/* Workaround for some exotic platforms where NAN is missing
-		 * and the expression (0.0 / 0.0) does NOT result in a NaN.
-		 * Such platforms use the global 'duk_computed_nan' which must
-		 * be initialized at runtime.  Use 'volatile' to ensure that
-		 * the compiler will actually do the computation and not try
-		 * to do constant folding which might result in the original
-		 * problem.
-		 */
+		// Workaround for some exotic platforms where NAN is missing
+		// and the expression (0.0 / 0.0) does NOT result in a NaN.
+		// Such platforms use the global 'duk_computed_nan' which must
+		// be initialized at runtime.  Use 'volatile' to ensure that
+		//the compiler will actually do the computation and not try
+		// to do constant folding which might result in the original
+		// problem.
+ 
 		volatile double dbl1 = 0.0;
 		volatile double dbl2 = 0.0;
 		duk_computed_nan = dbl1 / dbl2;
@@ -47865,38 +47875,40 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 
 #if defined(DUK_USE_COMPUTED_INFINITY)
 	do {
-		/* Similar workaround for INFINITY. */
+		// Similar workaround for INFINITY.
 		volatile double dbl1 = 1.0;
 		volatile double dbl2 = 0.0;
 		duk_computed_infinity = dbl1 / dbl2;
 	} while (0);
 #endif
 
-	/*
-	 *  Allocate heap struct
-	 *
-	 *  Use a raw call, all macros expect the heap to be initialized
-	 */
+	// Allocate heap struct
+	// Use a raw call, all macros expect the heap to be initialized
+
 
 #if defined(DUK_USE_INJECT_HEAP_ALLOC_ERROR) && (DUK_USE_INJECT_HEAP_ALLOC_ERROR == 1)
+	fatal_func(heap_udata, "alloc_func failed");
 	goto failed;
 #endif
+		fatal_func(heap_udata, "alloc duk_heap object");
 	DUK_D(DUK_DPRINT("alloc duk_heap object"));
 	res = (duk_heap *) alloc_func(heap_udata, sizeof(duk_heap));
 	if (!res) {
+		fatal_func(heap_udata, "alloc_func failed");
+
 		goto failed;
 	}
 
-	/*
-	 *  Zero the struct, and start initializing roughly in order
-	 */
+	fatal_func(heap_udata, "Zero the struct, and start initializing roughly in order");
+	//  Zero the struct, and start initializing roughly in order
+		
 
 	duk_memzero(res, sizeof(*res));
 #if defined(DUK_USE_ASSERTIONS)
 	res->heap_initializing = 1;
 #endif
 
-	/* explicit NULL inits */
+	// explicit NULL inits
 #if defined(DUK_USE_EXPLICIT_NULL_INIT)
 	res->heap_udata = NULL;
 	res->heap_allocated = NULL;
@@ -47924,10 +47936,10 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	res->strtable = NULL;
 #endif
 #if defined(DUK_USE_ROM_STRINGS)
-	/* no res->strs[] */
-#else  /* DUK_USE_ROM_STRINGS */
+	// no res->strs[]
+#else  // DUK_USE_ROM_STRINGS
 #if defined(DUK_USE_HEAPPTR16)
-	/* res->strs16[] is zeroed and zero decodes to NULL, so no NULL inits. */
+	// res->strs16[] is zeroed and zero decodes to NULL, so no NULL inits.
 #else
 	{
 		duk_small_uint_t i;
@@ -47936,7 +47948,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	        }
 	}
 #endif
-#endif  /* DUK_USE_ROM_STRINGS */
+#endif  // DUK_USE_ROM_STRINGS
 #if defined(DUK_USE_DEBUGGER_SUPPORT)
 	res->dbg_read_cb = NULL;
 	res->dbg_write_cb = NULL;
@@ -47947,7 +47959,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	res->dbg_udata = NULL;
 	res->dbg_pause_act = NULL;
 #endif
-#endif  /* DUK_USE_EXPLICIT_NULL_INIT */
+#endif  // DUK_USE_EXPLICIT_NULL_INIT
 
 	res->alloc_func = alloc_func;
 	res->realloc_func = realloc_func;
@@ -47955,16 +47967,16 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	res->heap_udata = heap_udata;
 	res->fatal_func = fatal_func;
 
-	/* XXX: for now there's a pointer packing zero assumption, i.e.
-	 * NULL <=> compressed pointer 0.  If this is removed, may need
-	 * to precompute e.g. null16 here.
-	 */
+// XXX: for now there's a pointer packing zero assumption, i.e.
+	// NULL <=> compressed pointer 0.  If this is removed, may need
+	//to precompute e.g. null16 here.
+ 
 
-	/* res->ms_trigger_counter == 0 -> now causes immediate GC; which is OK */
+	// res->ms_trigger_counter == 0 -> now causes immediate GC; which is O
 
-	/* Prevent mark-and-sweep and finalizer execution until heap is completely
-	 * initialized.
-	 */
+	//Prevent mark-and-sweep and finalizer execution until heap is completely
+	//initialized.
+	
 	DUK_ASSERT(res->ms_prevent_count == 0);
 	DUK_ASSERT(res->pf_prevent_count == 0);
 	res->ms_prevent_count = 1;
@@ -47974,38 +47986,39 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	res->call_recursion_depth = 0;
 	res->call_recursion_limit = DUK_USE_NATIVE_CALL_RECLIMIT;
 
-	/* XXX: use the pointer as a seed for now: mix in time at least */
+	// XXX: use the pointer as a seed for now: mix in time at least
 
-	/* The casts through duk_uintptr_t is to avoid the following GCC warning:
-	 *
-	 *   warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-	 *
-	 * This still generates a /Wp64 warning on VS2010 when compiling for x86.
-	 */
+	// The casts through duk_uintptr_t is to avoid the following GCC warning:
+
+	//  warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+
+	// This still generates a /Wp64 warning on VS2010 when compiling for x86.
+	fatal_func(heap_udata, "aaaa");
+
 #if defined(DUK_USE_ROM_STRINGS)
-	/* XXX: make a common DUK_USE_ option, and allow custom fixed seed? */
+	// XXX: make a common DUK_USE_ option, and allow custom fixed seed?
 	DUK_D(DUK_DPRINT("using rom strings, force heap hash_seed to fixed value 0x%08lx", (long) DUK__FIXED_HASH_SEED));
 	res->hash_seed = (duk_uint32_t) DUK__FIXED_HASH_SEED;
-#else  /* DUK_USE_ROM_STRINGS */
+#else  // DUK_USE_ROM_STRINGS
 	res->hash_seed = (duk_uint32_t) (duk_uintptr_t) res;
 #if !defined(DUK_USE_STRHASH_DENSE)
-	res->hash_seed ^= 5381;  /* Bernstein hash init value is normally 5381; XOR it in in case pointer low bits are 0 */
+	res->hash_seed ^= 5381; //Bernstein hash init value is normally 5381; XOR it in in case pointer low bits are 0
 #endif
-#endif  /* DUK_USE_ROM_STRINGS */
+#endif  // DUK_USE_ROM_STRINGS
 
+		fatal_func(heap_udata, "DUK_USE_EXPLICIT_NULL_INIT");
 #if defined(DUK_USE_EXPLICIT_NULL_INIT)
 	res->lj.jmpbuf_ptr = NULL;
 #endif
-	DUK_ASSERT(res->lj.type == DUK_LJ_TYPE_UNKNOWN);  /* zero */
+	DUK_ASSERT(res->lj.type == DUK_LJ_TYPE_UNKNOWN);  ///zero
 	DUK_ASSERT(res->lj.iserror == 0);
 	DUK_TVAL_SET_UNDEFINED(&res->lj.value1);
 	DUK_TVAL_SET_UNDEFINED(&res->lj.value2);
 
 	DUK_ASSERT_LJSTATE_UNSET(res);
 
-	/*
-	 *  Init stringtable: fixed variant
-	 */
+	// Init stringtable: fixed variant
+	fatal_func(heap_udata, "Init stringtable");
 
 	st_initsize = DUK_USE_STRTAB_MINSIZE;
 #if defined(DUK_USE_STRTAB_PTRCOMP)
@@ -48024,9 +48037,10 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 #if (DUK_USE_STRTAB_MINSIZE != DUK_USE_STRTAB_MAXSIZE)
 	DUK_ASSERT(res->st_count == 0);
 #endif
+		fatal_func(heap_udata, "DUK_USE_STRTAB_PTRCOMP");
 
 #if defined(DUK_USE_STRTAB_PTRCOMP)
-	/* zero assumption */
+	// zero assumption
 	duk_memzero(res->strtable16, sizeof(duk_uint16_t) * st_initsize);
 #else
 #if defined(DUK_USE_EXPLICIT_NULL_INIT)
@@ -48038,15 +48052,16 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	}
 #else
 	duk_memzero(res->strtable, sizeof(duk_hstring *) * st_initsize);
-#endif  /* DUK_USE_EXPLICIT_NULL_INIT */
-#endif  /* DUK_USE_STRTAB_PTRCOMP */
+#endif  // DUK_USE_EXPLICIT_NULL_INIT
+#endif  /// DUK_USE_STRTAB_PTRCOMP
 
-	/*
-	 *  Init stringcache
-	 */
+	fatal_func(heap_udata, "DUK_USE_EXPLICIT_NULL_INIT");
+	//  Init stringcache
+	
 
 #if defined(DUK_USE_EXPLICIT_NULL_INIT)
 	{
+		fatal_func(heap_udata, "i < DUK_HEAP_STRCACHE_SIZE");
 		duk_uint_t i;
 		for (i = 0; i < DUK_HEAP_STRCACHE_SIZE; i++) {
 			res->strcache[i].h = NULL;
@@ -48054,9 +48069,8 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	}
 #endif
 
-	/*
-	 *  Init litcache
-	 */
+	//  Init litcache
+	fatal_func(heap_udata, "Init litcache");
 #if defined(DUK_USE_LITCACHE_SIZE)
 	DUK_ASSERT(DUK_USE_LITCACHE_SIZE > 0);
 	DUK_ASSERT(DUK_IS_POWER_OF_TWO((duk_uint_t) DUK_USE_LITCACHE_SIZE));
@@ -48069,76 +48083,78 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 		}
 	}
 #endif
-#endif  /* DUK_USE_LITCACHE_SIZE */
+#endif  // DUK_USE_LITCACHE_SIZE
 
-	/* XXX: error handling is incomplete.  It would be cleanest if
-	 * there was a setjmp catchpoint, so that all init code could
-	 * freely throw errors.  If that were the case, the return code
-	 * passing here could be removed.
-	 */
+	// XXX: error handling is incomplete.  It would be cleanest if
+	// there was a setjmp catchpoint, so that all init code could
+	//freely throw errors.  If that were the case, the return code
+	// passing here could be removed.
 
-	/*
-	 *  Init built-in strings
-	 */
+
+	// Init built-in strings
+	
 
 #if defined(DUK_USE_INJECT_HEAP_ALLOC_ERROR) && (DUK_USE_INJECT_HEAP_ALLOC_ERROR == 2)
 	goto failed;
 #endif
+		fatal_func(heap_udata, "heap init: initialize heap strings");
 	DUK_D(DUK_DPRINT("heap init: initialize heap strings"));
 	if (!duk__init_heap_strings(res)) {
+		fatal_func(heap_udata, "!duk__init_heap_strings");
 		goto failed;
 	}
 
-	/*
-	 *  Init the heap thread
-	 */
+	//  Init the heap thread
+	fatal_func(heap_udata, "Init the heap thread");
 
 #if defined(DUK_USE_INJECT_HEAP_ALLOC_ERROR) && (DUK_USE_INJECT_HEAP_ALLOC_ERROR == 3)
 	goto failed;
 #endif
+		
 	DUK_D(DUK_DPRINT("heap init: initialize heap thread"));
 	if (!duk__init_heap_thread(res)) {
+		fatal_func(heap_udata, "!duk__init_heap_thread");
 		goto failed;
 	}
 
-	/*
-	 *  Init the heap object
-	 */
+	//  Init the heap object
+	
 
 #if defined(DUK_USE_INJECT_HEAP_ALLOC_ERROR) && (DUK_USE_INJECT_HEAP_ALLOC_ERROR == 4)
 	goto failed;
 #endif
+		fatal_func(heap_udata, "initialize heap object");
 	DUK_D(DUK_DPRINT("heap init: initialize heap object"));
 	DUK_ASSERT(res->heap_thread != NULL);
 	res->heap_object = duk_hobject_alloc_unchecked(res, DUK_HOBJECT_FLAG_EXTENSIBLE |
 	                                                    DUK_HOBJECT_FLAG_FASTREFS |
 	                                                    DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJECT));
 	if (res->heap_object == NULL) {
-		goto failed;
+ 		fatal_func(heap_udata, "!duk_hobject_alloc_unchecked");
+		 goto failed;
 	}
 	DUK_HOBJECT_INCREF(res->heap_thread, res->heap_object);
 
-	/*
-	 *  Odds and ends depending on the heap thread
-	 */
-
+	// Odds and ends depending on the heap thread
+	
+// *
 #if !defined(DUK_USE_GET_RANDOM_DOUBLE)
 #if defined(DUK_USE_PREFER_SIZE) || !defined(DUK_USE_64BIT_OPS)
 	res->rnd_state = (duk_uint32_t) duk_time_get_ecmascript_time(res->heap_thread);
 	duk_util_tinyrandom_prepare_seed(res->heap_thread);
 #else
 	res->rnd_state[0] = (duk_uint64_t) duk_time_get_ecmascript_time(res->heap_thread);
-	DUK_ASSERT(res->rnd_state[1] == 0);  /* Not filled here, filled in by seed preparation. */
-#if 0  /* Manual test values matching misc/xoroshiro128plus_test.c. */
+	DUK_ASSERT(res->rnd_state[1] == 0);  //Not filled here, filled in by seed preparation.
+#if 0 // Manual test values matching misc/xoroshiro128plus_test.c.
 	res->rnd_state[0] = DUK_U64_CONSTANT(0xdeadbeef12345678);
 	res->rnd_state[1] = DUK_U64_CONSTANT(0xcafed00d12345678);
 #endif
 	duk_util_tinyrandom_prepare_seed(res->heap_thread);
-	/* Mix in heap pointer: this ensures that if two Duktape heaps are
-	 * created on the same millisecond, they get a different PRNG
-	 * sequence (unless e.g. virtual memory addresses cause also the
-	 * heap object pointer to be the same).
-	 */
+	// Mix in heap pointer: this ensures that if two Duktape heaps are
+// created on the same millisecond, they get a different PRNG
+	// sequence (unless e.g. virtual memory addresses cause also the
+	// heap object pointer to be the same).
+
 	{
 		duk_uint64_t tmp_u64;
 		tmp_u64 = 0;
@@ -48150,19 +48166,18 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	do {
 		duk_small_uint_t i;
 		for (i = 0; i < 10; i++) {
-			/* Throw away a few initial random numbers just in
-			 * case.  Probably unnecessary due to SplitMix64
-			 * preparation.
-			 */
+			// Throw away a few initial random numbers just in
+			// case.  Probably unnecessary due to SplitMix64
+			// preparation.
+			
 			(void) duk_util_tinyrandom_get_double(res->heap_thread);
 		}
 	} while (0);
 #endif
 #endif
 
-	/*
-	 *  Allow finalizer and mark-and-sweep processing.
-	 */
+	//  Allow finalizer and mark-and-sweep processing.
+	
 
 	DUK_D(DUK_DPRINT("heap init: allow finalizer/mark-and-sweep processing"));
 	DUK_ASSERT(res->ms_prevent_count == 1);
@@ -48173,21 +48188,22 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 #if defined(DUK_USE_ASSERTIONS)
 	res->heap_initializing = 0;
 #endif
+//*/
+	//  All done.
+   fatal_func(heap_udata, "All done.");
 
-	/*
-	 *  All done.
-	 */
 
 	DUK_D(DUK_DPRINT("allocated heap: %p", (void *) res));
+		fatal_func(heap_udata, "allocated heap:.");
 	return res;
 
  failed:
 	DUK_D(DUK_DPRINT("heap allocation failed"));
 
 	if (res != NULL) {
-		/* Assumes that allocated pointers and alloc funcs are valid
-		 * if res exists.
-		 */
+		//Assumes that allocated pointers and alloc funcs are valid
+		// if res exists.
+		
 		DUK_ASSERT(res->ms_prevent_count == 1);
 		DUK_ASSERT(res->pf_prevent_count == 1);
 		DUK_ASSERT(res->ms_running == 0);
