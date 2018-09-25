@@ -2,6 +2,8 @@
 
 
 #include "Types.h"
+#include "Heap.h"
+#include "Debug.h"
 
 
 #if defined(TARGET_CPP)
@@ -110,12 +112,17 @@ public:
 	template<typename T> static uint32_t	GetUnmodifiedAddress32(T* Addr)	{	return (uint32_t)GetUnmodifiedAddress(Addr);	}
 	
 	static void		Sleep(uint32_t Milliseconds);
+	static void		DebugLog(const char* String);
 	
 public:
 	static uint32_t	mCpuMemoryBase;
 	static uint32_t	mCpuMemorySize;
 	static uint32_t	mGpuMemoryBase;
 	static uint32_t	mGpuMemorySize;
+	
+	std::function<void(const char*)>	mPrintFunc;
+	Debug::TLogger	mDebugLogger;
+	THeap			mHeap;
 };
 
 

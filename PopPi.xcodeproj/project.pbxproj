@@ -47,6 +47,15 @@
 		BFEA8EE32158EE6000FA99CF /* duktape.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = duktape.c; path = "Source/duktape-2.3.0/src/duktape.c"; sourceTree = "<group>"; };
 		BFEA8EE42158EE6000FA99CF /* duktape.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = duktape.h; path = "Source/duktape-2.3.0/src/duktape.h"; sourceTree = "<group>"; };
 		BFEA8EE72158F6F900FA99CF /* Types.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Types.cpp; path = Source/Types.cpp; sourceTree = "<group>"; };
+		BFEA8EED215928E000FA99CF /* Js_Duktape.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Js_Duktape.cpp; path = Source/Js_Duktape.cpp; sourceTree = "<group>"; };
+		BFEA8EEE215928E000FA99CF /* Js_Duktape.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Js_Duktape.h; path = Source/Js_Duktape.h; sourceTree = "<group>"; };
+		BFEA8EF22159604F00FA99CF /* PiGpu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PiGpu.h; path = Source/PiGpu.h; sourceTree = "<group>"; };
+		BFEA8EF32159604F00FA99CF /* PiGpu.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = PiGpu.cpp; path = Source/PiGpu.cpp; sourceTree = "<group>"; };
+		BFEA8EF4215968B400FA99CF /* Heap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Heap.h; path = Source/Heap.h; sourceTree = "<group>"; };
+		BFEA8EF5215968B400FA99CF /* Heap.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Heap.cpp; path = Source/Heap.cpp; sourceTree = "<group>"; };
+		BFEA8EF621596AD900FA99CF /* Debug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Debug.h; path = Source/Debug.h; sourceTree = "<group>"; };
+		BFEA8EF721596B1E00FA99CF /* Debug.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Debug.cpp; path = Source/Debug.cpp; sourceTree = "<group>"; };
+		BFEA8EF8215970AC00FA99CF /* Kernel.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Kernel.cpp; path = Source/Kernel.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -57,11 +66,16 @@
 				BF7026DC1FBDEC0C00354F35 /* loader */,
 				BF7026D41FBDE7D600354F35 /* periph.c */,
 				BF7026D51FBDE7D600354F35 /* vectors.s */,
+				BFEA8EF32159604F00FA99CF /* PiGpu.cpp */,
+				BFEA8EF22159604F00FA99CF /* PiGpu.h */,
 				BF7026D61FBDE7D600354F35 /* video01.cpp */,
 				BF7026D71FBDE7DE00354F35 /* makefile */,
 				BF030B701FC35E6E001BBB03 /* Sprites.h */,
 				BF030B721FC36DA5001BBB03 /* SpriteCharAtlas.inc */,
 				BF030B711FC35EAB001BBB03 /* Kernel.h */,
+				BFEA8EF8215970AC00FA99CF /* Kernel.cpp */,
+				BFEA8EF621596AD900FA99CF /* Debug.h */,
+				BFEA8EF721596B1E00FA99CF /* Debug.cpp */,
 				BF030B6F1FC35E43001BBB03 /* Sprites.cpp */,
 				BF5EC01B1FC7012B002ABF16 /* Blitter.cpp */,
 				BF5EC01C1FC70137002ABF16 /* Blitter.h */,
@@ -71,6 +85,8 @@
 				BF5EC01F1FC70CD1002ABF16 /* Display.h */,
 				BF5EC0201FC70EE8002ABF16 /* Mailbox.cpp */,
 				BF5EC0211FC70EF3002ABF16 /* Mailbox.h */,
+				BFEA8EF5215968B400FA99CF /* Heap.cpp */,
+				BFEA8EF4215968B400FA99CF /* Heap.h */,
 				BF5EC0231FC85750002ABF16 /* Memory.cpp */,
 				BF5EC0241FC85750002ABF16 /* Memory.h */,
 				BF5EC0251FC9F463002ABF16 /* Red.frag */,
@@ -82,6 +98,8 @@
 				BF71CDF41FCE26DE0084D367 /* Frag_Rgb.qpuasm.h */,
 				BF71CDF21FCE26800084D367 /* Frag_UvTick.qpuasm */,
 				BF71CDF31FCE26D20084D367 /* Frag_UvTick.qpuasm.h */,
+				BFEA8EED215928E000FA99CF /* Js_Duktape.cpp */,
+				BFEA8EEE215928E000FA99CF /* Js_Duktape.h */,
 			);
 			name = Source;
 			sourceTree = "<group>";
