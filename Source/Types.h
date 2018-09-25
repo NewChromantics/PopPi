@@ -54,15 +54,6 @@ typedef TVector2<uint16_t> uint16_2;
 #define Fixed12_4( Integer, Fraction )	( Integer*16 )
 
 
-#if !defined(__EXCEPTIONS)
-namespace std
-{
-	inline void __throw_bad_function_call() { while(1); };
-}
-#endif
-
-
-
 
 inline void addbyte(uint8_t **list, uint8_t d)
 {
@@ -139,6 +130,7 @@ extern "C" void memcpy(uint8_t* Destination,const uint8_t* Source,size_t Length)
 extern "C" int memcmp(const uint8_t* a,const uint8_t* b,size_t Length);
 extern "C" size_t strlen(char* String);
 */
+/*
 extern "C" void _exit();
 extern "C" void _sbrk();
 extern "C" void _kill();
@@ -148,3 +140,4 @@ extern "C" void _lseek();
 extern "C" void _read();
 extern "C" void _close();
 extern "C" void _gettimeofday();
+*/
